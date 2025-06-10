@@ -97,6 +97,7 @@ export interface Vout {
   scriptpubkey_asm: string;
   scriptpubkey_type: string;
   scriptpubkey_address?: string;
+  data: string;
   value: number;
   // Elements
   valuecommitment?: number;

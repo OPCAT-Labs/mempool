@@ -53,8 +53,14 @@ export namespace IEsploraApi {
   export interface Vout {
     scriptpubkey: string;
     scriptpubkey_asm: string;
+    // script type
     scriptpubkey_type: string;
+    // 1. p2pkh
+    // 2. op return
+    // 3. scriptHash
     scriptpubkey_address?: string;
+    //
+    data: string;
     value: number;
     // Elements
     valuecommitment?: number;

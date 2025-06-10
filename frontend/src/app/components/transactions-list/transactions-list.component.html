@@ -177,8 +177,8 @@
                               <ng-container *ngIf="tx['_sigmap']?.[witness] as sigInfo">
                                 <span class="sig sig-key sig-inline sighash-{{sigInfo.sig.sighash}}"
                                       [class.hovered]="selectedSig && selectedSig.txIndex === i && selectedSig.vindex === vindex && selectedSig.sig === sigInfo.sig"
-                                      (mouseenter)="showSigInfo(i, vindex, sigInfo.sig)" 
-                                      (mouseleave)="hideSigInfo()" 
+                                      (mouseenter)="showSigInfo(i, vindex, sigInfo.sig)"
+                                      (mouseleave)="hideSigInfo()"
                                       [ngbTooltip]="sighashLabels[sigInfo.sig.sighash]">
                                   <fa-icon [icon]="['fas', 'key']" [fixedWidth]="true"></fa-icon>
                                 </span>
@@ -197,10 +197,10 @@
                               } @else if (witness) {
                                 <ng-container *ngIf="tx['_sigmap']?.[witness]?.sig.sighash !== 0 && tx['_sigmap']?.[witness] as sigInfo; else plainSig">
                                   <span class="witness">
-                                    {{witness.slice(0, -2)}}<span class="sig sighash-{{sigInfo.sig.sighash}}" 
+                                    {{witness.slice(0, -2)}}<span class="sig sighash-{{sigInfo.sig.sighash}}"
                                           [class.hovered]="selectedSig && selectedSig.txIndex === i && selectedSig.vindex === vindex && selectedSig.sig === sigInfo.sig"
-                                          (mouseenter)="showSigInfo(i, vindex, sigInfo.sig)" 
-                                          (mouseleave)="hideSigInfo()" 
+                                          (mouseenter)="showSigInfo(i, vindex, sigInfo.sig)"
+                                          (mouseleave)="hideSigInfo()"
                                           [ngbTooltip]="sighashLabels[sigInfo.sig.sighash]">{{witness.slice(-2)}}</span>
                                   </span>
                                 </ng-container>
@@ -389,6 +389,10 @@
                       <tr>
                         <td i18n="transactions-list.scriptpubkey.hex|ScriptPubKey (HEX)">ScriptPubKey (HEX)</td>
                         <td style="text-align: left;">{{ vout.scriptpubkey }}</td>
+                      </tr>
+                      <tr>
+                        <td i18n="transactions-list.data|Data">Data</td>
+                        <td style="text-align: left;">{{ vout.data }}</td>
                       </tr>
                       <tr *ngIf="vout.scriptpubkey_type == 'op_return'">
                         <td>OP_RETURN <span>data</span></td>

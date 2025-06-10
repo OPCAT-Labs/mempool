@@ -1,7 +1,15 @@
 import { TransactionFlags } from '@app/shared/filters.utils';
-import { getVarIntLength, parseMultisigScript, isPoint } from '@app/shared/script.utils';
+import {
+  getVarIntLength,
+  parseMultisigScript,
+  isPoint,
+} from '@app/shared/script.utils';
 import { Transaction, Vin } from '@interfaces/electrs.interface';
-import { CpfpInfo, RbfInfo, TransactionStripped } from '@interfaces/node-api.interface';
+import {
+  CpfpInfo,
+  RbfInfo,
+  TransactionStripped,
+} from '@interfaces/node-api.interface';
 import { StateService } from '@app/services/state.service';
 import { hash, Hash } from './sha256';
 import { AddressType } from './address-utils';
@@ -9,7 +17,7 @@ import { AddressType } from './address-utils';
 // Bitcoin Core default policy settings
 const MAX_STANDARD_TX_WEIGHT = 400_000;
 const MAX_BLOCK_SIGOPS_COST = 80_000;
-const MAX_STANDARD_TX_SIGOPS_COST = (MAX_BLOCK_SIGOPS_COST / 5);
+const MAX_STANDARD_TX_SIGOPS_COST = MAX_BLOCK_SIGOPS_COST / 5;
 const MIN_STANDARD_TX_NONWITNESS_SIZE = 65;
 const MAX_P2SH_SIGOPS = 15;
 const MAX_STANDARD_P2WSH_STACK_ITEMS = 100;
@@ -21,14 +29,18 @@ const DUST_RELAY_TX_FEE = 3;
 const MAX_OP_RETURN_RELAY = 83;
 const DEFAULT_PERMIT_BAREMULTISIG = true;
 
-export function countScriptSigops(script: string, isRawScript: boolean = false, witness: boolean = false): number {
+export function countScriptSigops(
+  script: string,
+  isRawScript: boolean = false,
+  witness: boolean = false
+): number {
   if (!script?.length) {
     return 0;
   }
 
   let sigops = 0;
   // count OP_CHECKSIG and OP_CHECKSIGVERIFY
-  sigops += (script.match(/OP_CHECKSIG/g)?.length || 0);
+  sigops += script.match(/OP_CHECKSIG/g)?.length || 0;
 
   // count OP_CHECKMULTISIG and OP_CHECKMULTISIGVERIFY
   if (isRawScript) {
@@ -36,7 +48,9 @@ export function countScriptSigops(script: string, isRawScript: boolean = false, 
     sigops += 20 * (script.match(/OP_CHECKMULTISIG/g)?.length || 0);
   } else {
     // in redeem scripts and witnesses, worth N if preceded by OP_N, 20 otherwise
-    const matches = script.matchAll(/(?:OP_(?:PUSHNUM_)?(\d+))? OP_CHECKMULTISIG/g);
+    const matches = script.matchAll(
+      /(?:OP_(?:PUSHNUM_)?(\d+))? OP_CHECKMULTISIG/g
+    );
     for (const match of matches) {
       const n = parseInt(match[1]);
       if (Number.isInteger(n)) {
@@ -47,15 +61,19 @@ export function countScriptSigops(script: string, isRawScript: boolean = false, 
     }
   }
 
-  return witness ? sigops : (sigops * 4);
+  return witness ? sigops : sigops * 4;
 }
 
-export function setSchnorrSighashFlags(flags: bigint, witness: string[]): bigint {
+export function setSchnorrSighashFlags(
+  flags: bigint,
+  witness: string[]
+): bigint {
   // no witness items
   if (!witness?.length) {
     return flags;
   }
-  const hasAnnex = witness.length > 1 && witness[witness.length - 1].startsWith('50');
+  const hasAnnex =
+    witness.length > 1 && witness[witness.length - 1].startsWith('50');
   if (witness?.length === (hasAnnex ? 2 : 1)) {
     // keypath spend, signature is the only witness item
     if (witness[0].length === 130) {
@@ -79,10 +97,11 @@ export function setSchnorrSighashFlags(flags: bigint, witness: string[]): bigint
 
 export function isDERSig(w: string): boolean {
   // heuristic to detect probable DER signatures
-  return (w.length >= 18
-    && w.startsWith('30') // minimum DER signature length is 8 bytes + sighash flag (see https://mempool.space/testnet/tx/c6c232a36395fa338da458b86ff1327395a9afc28c5d2daa4273e410089fd433)
-    && ['01', '02', '03', '81', '82', '83'].includes(w.slice(-2)) // signature must end with a valid sighash flag
-    && (w.length === (2 * parseInt(w.slice(2, 4), 16)) + 6) // second byte encodes the combined length of the R and S components
+  return (
+    w.length >= 18 &&
+    w.startsWith('30') && // minimum DER signature length is 8 bytes + sighash flag (see https://mempool.space/testnet/tx/c6c232a36395fa338da458b86ff1327395a9afc28c5d2daa4273e410089fd433)
+    ['01', '02', '03', '81', '82', '83'].includes(w.slice(-2)) && // signature must end with a valid sighash flag
+    w.length === 2 * parseInt(w.slice(2, 4), 16) + 6 // second byte encodes the combined length of the R and S components
   );
 }
 
@@ -102,7 +121,7 @@ export function isCanonicalDERSig(w: string): boolean {
 
   // second byte encodes the total length of the sequence (not including sighash flag)
   const compoundLength = parseInt(w.slice(2, 4), 16);
-  if (w.length !== (compoundLength * 2) + 6) {
+  if (w.length !== compoundLength * 2 + 6) {
     return false;
   }
 
@@ -114,10 +133,10 @@ export function isCanonicalDERSig(w: string): boolean {
   // fourth byte encodes the length of the R component
   const rLength = parseInt(w.slice(6, 8), 16);
   // rLength doesn't overflow remaining space
-  if (w.length < (rLength * 2) + 10) {
+  if (w.length < rLength * 2 + 10) {
     return false;
   }
-  const sEnd = 8 + (rLength * 2);
+  const sEnd = 8 + rLength * 2;
 
   // next byte after R is 0x02 ("INTEGER")
   if (w.slice(sEnd, sEnd + 2) !== '02') {
@@ -127,7 +146,7 @@ export function isCanonicalDERSig(w: string): boolean {
   // next byte encodes the length of the S component
   const sLength = parseInt(w.slice(sEnd + 2, sEnd + 4), 16);
   // R + S lengths exactly fit the length of the signature
-  if (w.length !== ((rLength + sLength) * 2) + 14) {
+  if (w.length !== (rLength + sLength) * 2 + 14) {
     return false;
   }
 
@@ -139,18 +158,18 @@ export enum SighashFlag {
   ALL = 1,
   NONE = 2,
   SINGLE = 3,
-  ANYONECANPAY = 0x80
+  ANYONECANPAY = 0x80,
 }
 
 export type SighashValue =
-  SighashFlag.DEFAULT |
-  SighashFlag.ALL |
-  SighashFlag.NONE |
-  SighashFlag.SINGLE |
-  (SighashFlag.ALL & SighashFlag.ANYONECANPAY) |
-  (SighashFlag.NONE & SighashFlag.ANYONECANPAY) |
-  (SighashFlag.SINGLE & SighashFlag.ANYONECANPAY) |
-  (SighashFlag.ALL & SighashFlag.NONE);
+  | SighashFlag.DEFAULT
+  | SighashFlag.ALL
+  | SighashFlag.NONE
+  | SighashFlag.SINGLE
+  | (SighashFlag.ALL & SighashFlag.ANYONECANPAY)
+  | (SighashFlag.NONE & SighashFlag.ANYONECANPAY)
+  | (SighashFlag.SINGLE & SighashFlag.ANYONECANPAY)
+  | (SighashFlag.ALL & SighashFlag.NONE);
 
 export const SighashLabels: Record<number, string> = {
   '0': 'SIGHASH_DEFAULT',
@@ -173,15 +192,15 @@ export class Sighash {
   }
 
   static isNone(val: SighashValue): boolean {
-    return (val & 0x7F) === SighashFlag.NONE;
+    return (val & 0x7f) === SighashFlag.NONE;
   }
 
   static isSingle(val: SighashValue): boolean {
-    return (val & 0x7F) === SighashFlag.SINGLE;
+    return (val & 0x7f) === SighashFlag.SINGLE;
   }
 
   static isAll(val: SighashValue): boolean {
-    return (val & 0x7F) === SighashFlag.ALL;
+    return (val & 0x7f) === SighashFlag.ALL;
   }
 
   static isDefault(val: SighashValue): boolean {
@@ -190,7 +209,10 @@ export class Sighash {
 }
 
 export function decodeSighashFlag(sighash: number): SighashValue {
-  if (sighash >= 0 && sighash <= 0x03 || sighash > 0x80 && sighash <= 0x83) {
+  if (
+    (sighash >= 0 && sighash <= 0x03) ||
+    (sighash > 0x80 && sighash <= 0x83)
+  ) {
     return sighash as SighashValue;
   }
   return SighashFlag.DEFAULT;
@@ -231,7 +253,7 @@ export function extractDERSignaturesASM(script_asm: string): SigInfo[] {
         const sighash = decodeSighashFlag(parseInt(hexData.slice(-2), 16));
         signatures.push({
           signature: hexData,
-          sighash
+          sighash,
         });
       }
     }
@@ -267,35 +289,44 @@ export function extractSchnorrSignatures(witnesses: string[]): SigInfo[] {
 export function processInputSignatures(vin: Vin): SigInfo[] {
   const addressType = vin.prevout?.scriptpubkey_type as AddressType;
   let signatures: SigInfo[] = [];
-  switch(addressType) {
+  switch (addressType) {
     case 'p2pk':
     case 'multisig':
     case 'p2pkh':
       signatures = extractDERSignaturesASM(vin.scriptsig_asm);
       break;
-    case 'p2sh': {
-      if (vin.witness?.length) {
-        signatures = extractDERSignaturesWitness(vin.witness || []);
-      } else {
-        signatures = [...extractDERSignaturesASM(vin.scriptsig_asm), ...extractDERSignaturesASM(vin.inner_redeemscript_asm)];
+    case 'p2sh':
+      {
+        if (vin.witness?.length) {
+          signatures = extractDERSignaturesWitness(vin.witness || []);
+        } else {
+          signatures = [
+            ...extractDERSignaturesASM(vin.scriptsig_asm),
+            ...extractDERSignaturesASM(vin.inner_redeemscript_asm),
+          ];
+        }
       }
-    } break;
+      break;
     case 'v0_p2wpkh':
       signatures = extractDERSignaturesWitness(vin.witness || []);
       break;
     case 'v0_p2wsh':
       signatures = extractDERSignaturesWitness(vin.witness || []);
       break;
-    case 'v1_p2tr': {
-      const hasAnnex = vin.witness.length > 1 &&vin.witness[vin.witness.length - 1].startsWith('50');
-      const isKeyspend = vin.witness.length === (hasAnnex ? 2 : 1);
-      if (isKeyspend) {
-        signatures = extractSchnorrSignatures(vin.witness);
-      } else {
-        const stackItems = vin.witness.slice(0, hasAnnex ? -3 : -2);
-        signatures = extractSchnorrSignatures(stackItems);
+    case 'v1_p2tr':
+      {
+        const hasAnnex =
+          vin.witness.length > 1 &&
+          vin.witness[vin.witness.length - 1].startsWith('50');
+        const isKeyspend = vin.witness.length === (hasAnnex ? 2 : 1);
+        if (isKeyspend) {
+          signatures = extractSchnorrSignatures(vin.witness);
+        } else {
+          const stackItems = vin.witness.slice(0, hasAnnex ? -3 : -2);
+          signatures = extractSchnorrSignatures(stackItems);
+        }
       }
-    } break;
+      break;
     default:
       // non-signed input types?
       break;
@@ -312,7 +343,11 @@ export function processInputSignatures(vin: Vin): SigInfo[] {
  * As standardness rules change, we'll need to apply the rules in force *at the time* to older blocks.
  * For now, just pull out individual rules into versioned functions where necessary.
  */
-export function isNonStandard(tx: Transaction, height?: number, network?: string): boolean {
+export function isNonStandard(
+  tx: Transaction,
+  height?: number,
+  network?: string
+): boolean {
   // version
   if (isNonStandardVersion(tx, height, network)) {
     return true;
@@ -340,7 +375,7 @@ export function isNonStandard(tx: Transaction, height?: number, network?: string
       return false;
     }
     // scriptsig-size
-    if ((vin.scriptsig.length / 2) > MAX_STANDARD_SCRIPTSIG_SIZE) {
+    if (vin.scriptsig.length / 2 > MAX_STANDARD_SCRIPTSIG_SIZE) {
       return true;
     }
     // scriptsig-not-pushonly
@@ -355,25 +390,32 @@ export function isNonStandard(tx: Transaction, height?: number, network?: string
     if (vin.prevout?.scriptpubkey_type === 'p2sh') {
       // TODO: evaluate script (https://github.com/bitcoin/bitcoin/blob/1ac627c485a43e50a9a49baddce186ee3ad4daad/src/policy/policy.cpp#L177)
       // countScriptSigops returns the witness-scaled sigops, so divide by 4 before comparison with MAX_P2SH_SIGOPS
-      const sigops = (countScriptSigops(vin.inner_redeemscript_asm || '') / 4);
+      const sigops = countScriptSigops(vin.inner_redeemscript_asm || '') / 4;
       if (sigops > MAX_P2SH_SIGOPS) {
         return true;
       }
-    } else if (['unknown', 'provably_unspendable', 'empty'].includes(vin.prevout?.scriptpubkey_type || '')) {
+    } else if (
+      ['unknown', 'provably_unspendable', 'empty'].includes(
+        vin.prevout?.scriptpubkey_type || ''
+      )
+    ) {
       return true;
     } else if (isNonStandardAnchor(tx, height, network)) {
       return true;
     }
     // bad-witness-nonstandard
     if (vin.prevout?.scriptpubkey_type === 'v1_p2tr' && vin.witness?.length) {
-      const hasAnnex = vin.witness.length > 1 && vin.witness[vin.witness.length - 1].startsWith('50');
+      const hasAnnex =
+        vin.witness.length > 1 &&
+        vin.witness[vin.witness.length - 1].startsWith('50');
       // annex is non-standard
       if (hasAnnex) {
         return true;
       }
       if (vin.witness.length > (hasAnnex ? 2 : 1)) {
         // script path spend
-        const controlBlock = vin.witness[vin.witness.length - (hasAnnex ? 2 : 1)];
+        const controlBlock =
+          vin.witness[vin.witness.length - (hasAnnex ? 2 : 1)];
         // control block is required
         if (!controlBlock.length) {
           return false;
@@ -384,7 +426,11 @@ export function isNonStandard(tx: Transaction, height?: number, network?: string
           }
         }
         // remaining witness items (except for the script) must be within MAX_STANDARD_TAPSCRIPT_STACK_ITEM_SIZE limit
-        if (vin.witness.slice(0, vin.witness.length - (hasAnnex ? 3 : 2)).some(v => v.length > 160)) {
+        if (
+          vin.witness
+            .slice(0, vin.witness.length - (hasAnnex ? 3 : 2))
+            .some((v) => v.length > 160)
+        ) {
           return false;
         }
       }
@@ -396,13 +442,20 @@ export function isNonStandard(tx: Transaction, height?: number, network?: string
   let opreturnCount = 0;
   for (const vout of tx.vout) {
     // scriptpubkey
-    if (['nonstandard', 'provably_unspendable', 'empty'].includes(vout.scriptpubkey_type)) {
+    if (
+      ['nonstandard', 'provably_unspendable', 'empty'].includes(
+        vout.scriptpubkey_type
+      )
+    ) {
       // (non-standard output type)
       return true;
     } else if (vout.scriptpubkey_type === 'unknown') {
       // undefined segwit version/length combinations are actually standard in outputs
       // https://github.com/bitcoin/bitcoin/blob/2c79abc7ad4850e9e3ba32a04c530155cda7f980/src/script/interpreter.cpp#L1950-L1951
-      if (vout.scriptpubkey.startsWith('00') || !isWitnessProgram(vout.scriptpubkey)) {
+      if (
+        vout.scriptpubkey.startsWith('00') ||
+        !isWitnessProgram(vout.scriptpubkey)
+      ) {
         return true;
       }
     } else if (vout.scriptpubkey_type === 'multisig') {
@@ -417,7 +470,7 @@ export function isNonStandard(tx: Transaction, height?: number, network?: string
       }
     } else if (vout.scriptpubkey_type === 'op_return') {
       opreturnCount++;
-      if ((vout.scriptpubkey.length / 2) > MAX_OP_RETURN_RELAY) {
+      if (vout.scriptpubkey.length / 2 > MAX_OP_RETURN_RELAY) {
         // over default datacarrier limit
         return true;
       }
@@ -425,7 +478,7 @@ export function isNonStandard(tx: Transaction, height?: number, network?: string
     // dust
     // (we could probably hardcode this for the different output types...)
     if (vout.scriptpubkey_type !== 'op_return') {
-      let dustSize = (vout.scriptpubkey.length / 2);
+      let dustSize = vout.scriptpubkey.length / 2;
       // add varint length overhead
       dustSize += getVarIntLength(dustSize);
       // add value size
@@ -435,7 +488,7 @@ export function isNonStandard(tx: Transaction, height?: number, network?: string
       } else {
         dustSize += 148;
       }
-      if (vout.value < (dustSize * DUST_RELAY_TX_FEE)) {
+      if (vout.value < dustSize * DUST_RELAY_TX_FEE) {
         // under minimum output size
         return true;
       }
@@ -455,18 +508,22 @@ export function isNonStandard(tx: Transaction, height?: number, network?: string
 // Individual versioned standardness rules
 
 const V3_STANDARDNESS_ACTIVATION_HEIGHT = {
-  'testnet4': 42_000,
-  'testnet': 2_900_000,
-  'signet': 211_000,
+  testnet4: 42_000,
+  testnet: 2_900_000,
+  signet: 211_000,
   '': 863_500,
 };
-function isNonStandardVersion(tx: Transaction, height?: number, network?: string): boolean {
+function isNonStandardVersion(
+  tx: Transaction,
+  height?: number,
+  network?: string
+): boolean {
   let TX_MAX_STANDARD_VERSION = 3;
   if (
-    height != null
-    && network != null
-    && V3_STANDARDNESS_ACTIVATION_HEIGHT[network]
-    && height <= V3_STANDARDNESS_ACTIVATION_HEIGHT[network]
+    height != null &&
+    network != null &&
+    V3_STANDARDNESS_ACTIVATION_HEIGHT[network] &&
+    height <= V3_STANDARDNESS_ACTIVATION_HEIGHT[network]
   ) {
     // V3 transactions were non-standard to spend before v28.x (scheduled for 2024/09/30 https://github.com/bitcoin/bitcoin/issues/29891)
     TX_MAX_STANDARD_VERSION = 2;
@@ -479,17 +536,21 @@ function isNonStandardVersion(tx: Transaction, height?: number, network?: string
 }
 
 const ANCHOR_STANDARDNESS_ACTIVATION_HEIGHT = {
-  'testnet4': 42_000,
-  'testnet': 2_900_000,
-  'signet': 211_000,
+  testnet4: 42_000,
+  testnet: 2_900_000,
+  signet: 211_000,
   '': 863_500,
 };
-function isNonStandardAnchor(tx: Transaction, height?: number, network?: string): boolean {
+function isNonStandardAnchor(
+  tx: Transaction,
+  height?: number,
+  network?: string
+): boolean {
   if (
-    height != null
-    && network != null
-    && ANCHOR_STANDARDNESS_ACTIVATION_HEIGHT[network]
-    && height <= ANCHOR_STANDARDNESS_ACTIVATION_HEIGHT[network]
+    height != null &&
+    network != null &&
+    ANCHOR_STANDARDNESS_ACTIVATION_HEIGHT[network] &&
+    height <= ANCHOR_STANDARDNESS_ACTIVATION_HEIGHT[network]
   ) {
     // anchor outputs were non-standard to spend before v28.x (scheduled for 2024/09/30 https://github.com/bitcoin/bitcoin/issues/29891)
     return true;
@@ -500,16 +561,18 @@ function isNonStandardAnchor(tx: Transaction, height?: number, network?: string)
 // A witness program is any valid scriptpubkey that consists of a 1-byte push opcode
 // followed by a data push between 2 and 40 bytes.
 // https://github.com/bitcoin/bitcoin/blob/2c79abc7ad4850e9e3ba32a04c530155cda7f980/src/script/script.cpp#L224-L240
-function isWitnessProgram(scriptpubkey: string): false | { version: number, program: string } {
+function isWitnessProgram(
+  scriptpubkey: string
+): false | { version: number; program: string } {
   if (scriptpubkey.length < 8 || scriptpubkey.length > 84) {
     return false;
   }
-  const version = parseInt(scriptpubkey.slice(0,2), 16);
-  if (version !== 0 && version < 0x51 || version > 0x60) {
-      return false;
+  const version = parseInt(scriptpubkey.slice(0, 2), 16);
+  if ((version !== 0 && version < 0x51) || version > 0x60) {
+    return false;
   }
-  const push = parseInt(scriptpubkey.slice(2,4), 16);
-  if (push + 2 === (scriptpubkey.length / 2)) {
+  const push = parseInt(scriptpubkey.slice(2, 4), 16);
+  if (push + 2 === scriptpubkey.length / 2) {
     return {
       version: version ? version - 0x50 : 0,
       program: scriptpubkey.slice(4),
@@ -528,7 +591,7 @@ export function getNonWitnessSize(tx: Transaction): number {
       weight -= getVarIntLength(vin.witness.length);
       for (const witness of vin.witness) {
         // witness item size + content
-        weight -= getVarIntLength(witness.length / 2) + (witness.length / 2);
+        weight -= getVarIntLength(witness.length / 2) + witness.length / 2;
       }
     }
   }
@@ -539,7 +602,10 @@ export function getNonWitnessSize(tx: Transaction): number {
   return Math.ceil(weight / 4);
 }
 
-export function setSegwitSighashFlags(flags: bigint, witness: string[]): bigint {
+export function setSegwitSighashFlags(
+  flags: bigint,
+  witness: string[]
+): bigint {
   for (const w of witness) {
     if (isCanonicalDERSig(w)) {
       flags |= setSighashFlags(flags, w);
@@ -548,7 +614,10 @@ export function setSegwitSighashFlags(flags: bigint, witness: string[]): bigint 
   return flags;
 }
 
-export function setLegacySighashFlags(flags: bigint, scriptsig_asm: string): bigint {
+export function setLegacySighashFlags(
+  flags: bigint,
+  scriptsig_asm: string
+): bigint {
   for (const item of scriptsig_asm.split(' ')) {
     // skip op_codes
     if (item.startsWith('OP_')) {
@@ -563,14 +632,27 @@ export function setLegacySighashFlags(flags: bigint, scriptsig_asm: string): big
 }
 
 export function setSighashFlags(flags: bigint, signature: string): bigint {
-  switch(signature.slice(-2)) {
-    case '01': return flags | TransactionFlags.sighash_all;
-    case '02': return flags | TransactionFlags.sighash_none;
-    case '03': return flags | TransactionFlags.sighash_single;
-    case '81': return flags | TransactionFlags.sighash_all | TransactionFlags.sighash_acp;
-    case '82': return flags | TransactionFlags.sighash_none | TransactionFlags.sighash_acp;
-    case '83': return flags | TransactionFlags.sighash_single | TransactionFlags.sighash_acp;
-    default: return flags | TransactionFlags.sighash_default; // taproot only
+  switch (signature.slice(-2)) {
+    case '01':
+      return flags | TransactionFlags.sighash_all;
+    case '02':
+      return flags | TransactionFlags.sighash_none;
+    case '03':
+      return flags | TransactionFlags.sighash_single;
+    case '81':
+      return (
+        flags | TransactionFlags.sighash_all | TransactionFlags.sighash_acp
+      );
+    case '82':
+      return (
+        flags | TransactionFlags.sighash_none | TransactionFlags.sighash_acp
+      );
+    case '83':
+      return (
+        flags | TransactionFlags.sighash_single | TransactionFlags.sighash_acp
+      );
+    default:
+      return flags | TransactionFlags.sighash_default; // taproot only
   }
 }
 
@@ -583,7 +665,13 @@ export function isBurnKey(pubkey: string): boolean {
   ].includes(pubkey);
 }
 
-export function getTransactionFlags(tx: Transaction, cpfpInfo?: CpfpInfo, replacement?: boolean, height?: number, network?: string): bigint {
+export function getTransactionFlags(
+  tx: Transaction,
+  cpfpInfo?: CpfpInfo,
+  replacement?: boolean,
+  height?: number,
+  network?: string
+): bigint {
   let flags = tx.flags ? BigInt(tx.flags) : 0n;
 
   // Update variable flags (CPFP, RBF)
@@ -612,8 +700,8 @@ export function getTransactionFlags(tx: Transaction, cpfpInfo?: CpfpInfo, replac
   } else if (tx.version === 3) {
     flags |= TransactionFlags.v3;
   }
-  const reusedInputAddresses: { [address: string ]: number } = {};
-  const reusedOutputAddresses: { [address: string ]: number } = {};
+  const reusedInputAddresses: { [address: string]: number } = {};
+  const reusedOutputAddresses: { [address: string]: number } = {};
   const inValues = {};
   const outValues = {};
   let rbf = false;
@@ -622,34 +710,49 @@ export function getTransactionFlags(tx: Transaction, cpfpInfo?: CpfpInfo, replac
       rbf = true;
     }
     switch (vin.prevout?.scriptpubkey_type) {
-      case 'p2pk': flags |= TransactionFlags.p2pk; break;
-      case 'multisig': flags |= TransactionFlags.p2ms; break;
-      case 'p2pkh': flags |= TransactionFlags.p2pkh; break;
-      case 'p2sh': flags |= TransactionFlags.p2sh; break;
-      case 'v0_p2wpkh': flags |= TransactionFlags.p2wpkh; break;
-      case 'v0_p2wsh': flags |= TransactionFlags.p2wsh; break;
-      case 'v1_p2tr': {
-        flags |= TransactionFlags.p2tr;
-        // every valid taproot input has at least one witness item, however transactions
-        // created before taproot activation don't need to have any witness data
-        // (see https://mempool.space/tx/b10c007c60e14f9d087e0291d4d0c7869697c6681d979c6639dbd960792b4d41)
-        if (vin.witness?.length) {
-          // in taproot, if the last witness item begins with 0x50, it's an annex
-          const hasAnnex = vin.witness?.[vin.witness.length - 1].startsWith('50');
-          // script spends have more than one witness item, not counting the annex (if present)
-          if (vin.witness.length > (hasAnnex ? 2 : 1)) {
-            // the script itself is the second-to-last witness item, not counting the annex
-            const asm = vin.inner_witnessscript_asm;
-            // inscriptions smuggle data within an 'OP_0 OP_IF ... OP_ENDIF' envelope
-            if (asm?.includes('OP_0 OP_IF')) {
-              flags |= TransactionFlags.inscription;
+      case 'p2pk':
+        flags |= TransactionFlags.p2pk;
+        break;
+      case 'multisig':
+        flags |= TransactionFlags.p2ms;
+        break;
+      case 'p2pkh':
+        flags |= TransactionFlags.p2pkh;
+        break;
+      case 'p2sh':
+        flags |= TransactionFlags.p2sh;
+        break;
+      case 'v0_p2wpkh':
+        flags |= TransactionFlags.p2wpkh;
+        break;
+      case 'v0_p2wsh':
+        flags |= TransactionFlags.p2wsh;
+        break;
+      case 'v1_p2tr':
+        {
+          flags |= TransactionFlags.p2tr;
+          // every valid taproot input has at least one witness item, however transactions
+          // created before taproot activation don't need to have any witness data
+          // (see https://mempool.space/tx/b10c007c60e14f9d087e0291d4d0c7869697c6681d979c6639dbd960792b4d41)
+          if (vin.witness?.length) {
+            // in taproot, if the last witness item begins with 0x50, it's an annex
+            const hasAnnex =
+              vin.witness?.[vin.witness.length - 1].startsWith('50');
+            // script spends have more than one witness item, not counting the annex (if present)
+            if (vin.witness.length > (hasAnnex ? 2 : 1)) {
+              // the script itself is the second-to-last witness item, not counting the annex
+              const asm = vin.inner_witnessscript_asm;
+              // inscriptions smuggle data within an 'OP_0 OP_IF ... OP_ENDIF' envelope
+              if (asm?.includes('OP_0 OP_IF')) {
+                flags |= TransactionFlags.inscription;
+              }
+            }
+            if (hasAnnex) {
+              flags |= TransactionFlags.annex;
             }
           }
-          if (hasAnnex) {
-            flags |= TransactionFlags.annex;
-          }
         }
-      } break;
+        break;
     }
 
     // sighash flags
@@ -662,9 +765,11 @@ export function getTransactionFlags(tx: Transaction, cpfpInfo?: CpfpInfo, replac
     }
 
     if (vin.prevout?.scriptpubkey_address) {
-      reusedInputAddresses[vin.prevout?.scriptpubkey_address] = (reusedInputAddresses[vin.prevout?.scriptpubkey_address] || 0) + 1;
+      reusedInputAddresses[vin.prevout?.scriptpubkey_address] =
+        (reusedInputAddresses[vin.prevout?.scriptpubkey_address] || 0) + 1;
     }
-    inValues[vin.prevout?.value || Math.random()] = (inValues[vin.prevout?.value || Math.random()] || 0) + 1;
+    inValues[vin.prevout?.value || Math.random()] =
+      (inValues[vin.prevout?.value || Math.random()] || 0) + 1;
   }
   if (rbf) {
     flags |= TransactionFlags.rbf;
@@ -676,30 +781,48 @@ export function getTransactionFlags(tx: Transaction, cpfpInfo?: CpfpInfo, replac
   let olgaSize = 0;
   for (const vout of tx.vout) {
     switch (vout.scriptpubkey_type) {
-      case 'p2pk': {
-        flags |= TransactionFlags.p2pk;
-        // detect fake pubkey (i.e. not a valid DER point on the secp256k1 curve)
-        hasFakePubkey = hasFakePubkey || !isPoint(vout.scriptpubkey?.slice(2, -2));
-      } break;
-      case 'multisig': {
-        flags |= TransactionFlags.p2ms;
-        // detect fake pubkeys (i.e. not valid DER points on the secp256k1 curve)
-        const asm = vout.scriptpubkey_asm;
-        for (const key of (asm?.split(' ') || [])) {
-          if (!hasFakePubkey && !key.startsWith('OP_')) {
-            hasFakePubkey = hasFakePubkey || isBurnKey(key) || !isPoint(key);
+      case 'p2pk':
+        {
+          flags |= TransactionFlags.p2pk;
+          // detect fake pubkey (i.e. not a valid DER point on the secp256k1 curve)
+          hasFakePubkey =
+            hasFakePubkey || !isPoint(vout.scriptpubkey?.slice(2, -2));
+        }
+        break;
+      case 'multisig':
+        {
+          flags |= TransactionFlags.p2ms;
+          // detect fake pubkeys (i.e. not valid DER points on the secp256k1 curve)
+          const asm = vout.scriptpubkey_asm;
+          for (const key of asm?.split(' ') || []) {
+            if (!hasFakePubkey && !key.startsWith('OP_')) {
+              hasFakePubkey = hasFakePubkey || isBurnKey(key) || !isPoint(key);
+            }
           }
         }
-      } break;
-      case 'p2pkh': flags |= TransactionFlags.p2pkh; break;
-      case 'p2sh': flags |= TransactionFlags.p2sh; break;
-      case 'v0_p2wpkh': flags |= TransactionFlags.p2wpkh; break;
-      case 'v0_p2wsh': flags |= TransactionFlags.p2wsh; break;
-      case 'v1_p2tr': flags |= TransactionFlags.p2tr; break;
-      case 'op_return': flags |= TransactionFlags.op_return; break;
+        break;
+      case 'p2pkh':
+        flags |= TransactionFlags.p2pkh;
+        break;
+      case 'p2sh':
+        flags |= TransactionFlags.p2sh;
+        break;
+      case 'v0_p2wpkh':
+        flags |= TransactionFlags.p2wpkh;
+        break;
+      case 'v0_p2wsh':
+        flags |= TransactionFlags.p2wsh;
+        break;
+      case 'v1_p2tr':
+        flags |= TransactionFlags.p2tr;
+        break;
+      case 'op_return':
+        flags |= TransactionFlags.op_return;
+        break;
     }
     if (vout.scriptpubkey_address) {
-      reusedOutputAddresses[vout.scriptpubkey_address] = (reusedOutputAddresses[vout.scriptpubkey_address] || 0) + 1;
+      reusedOutputAddresses[vout.scriptpubkey_address] =
+        (reusedOutputAddresses[vout.scriptpubkey_address] || 0) + 1;
     }
     if (vout.scriptpubkey_type === 'v0_p2wsh') {
       if (!P2WSHCount) {
@@ -707,7 +830,7 @@ export function getTransactionFlags(tx: Transaction, cpfpInfo?: CpfpInfo, replac
       }
       P2WSHCount++;
       if (P2WSHCount === Math.ceil((olgaSize + 2) / 32)) {
-        const nullBytes = (P2WSHCount * 32) - olgaSize - 2;
+        const nullBytes = P2WSHCount * 32 - olgaSize - 2;
         if (vout.scriptpubkey.endsWith(''.padEnd(nullBytes * 2, '0'))) {
           flags |= TransactionFlags.fake_scripthash;
         }
@@ -715,7 +838,8 @@ export function getTransactionFlags(tx: Transaction, cpfpInfo?: CpfpInfo, replac
     } else {
       P2WSHCount = 0;
     }
-    outValues[vout.value || Math.random()] = (outValues[vout.value || Math.random()] || 0) + 1;
+    outValues[vout.value || Math.random()] =
+      (outValues[vout.value || Math.random()] || 0) + 1;
   }
   if (hasFakePubkey) {
     flags |= TransactionFlags.fake_pubkey;
@@ -723,8 +847,22 @@ export function getTransactionFlags(tx: Transaction, cpfpInfo?: CpfpInfo, replac
 
   // fast but bad heuristic to detect possible coinjoins
   // (at least 5 inputs and 5 outputs, less than half of which are unique amounts, with no address reuse)
-  const addressReuse = Object.keys(reusedOutputAddresses).reduce((acc, key) => Math.max(acc, (reusedInputAddresses[key] || 0) + (reusedOutputAddresses[key] || 0)), 0) > 1;
-  if (!addressReuse && tx.vin.length >= 5 && tx.vout.length >= 5 && (Object.keys(inValues).length + Object.keys(outValues).length) <= (tx.vin.length + tx.vout.length) / 2 ) {
+  const addressReuse =
+    Object.keys(reusedOutputAddresses).reduce(
+      (acc, key) =>
+        Math.max(
+          acc,
+          (reusedInputAddresses[key] || 0) + (reusedOutputAddresses[key] || 0)
+        ),
+      0
+    ) > 1;
+  if (
+    !addressReuse &&
+    tx.vin.length >= 5 &&
+    tx.vout.length >= 5 &&
+    Object.keys(inValues).length + Object.keys(outValues).length <=
+      (tx.vin.length + tx.vout.length) / 2
+  ) {
     flags |= TransactionFlags.coinjoin;
   }
   // more than 5:1 input:output ratio
@@ -743,21 +881,26 @@ export function getTransactionFlags(tx: Transaction, cpfpInfo?: CpfpInfo, replac
   return flags;
 }
 
-export function getUnacceleratedFeeRate(tx: Transaction, accelerated: boolean): number {
+export function getUnacceleratedFeeRate(
+  tx: Transaction,
+  accelerated: boolean
+): number {
   if (accelerated) {
     let ancestorVsize = tx.weight / 4;
     let ancestorFee = tx.fee;
     for (const ancestor of tx.ancestors || []) {
-      ancestorVsize += (ancestor.weight / 4);
+      ancestorVsize += ancestor.weight / 4;
       ancestorFee += ancestor.fee;
     }
-    return Math.min(tx.fee / (tx.weight / 4), (ancestorFee / ancestorVsize));
+    return Math.min(tx.fee / (tx.weight / 4), ancestorFee / ancestorVsize);
   } else {
     return tx.effectiveFeePerVsize;
   }
 }
 
-export function identifyPrioritizedTransactions(transactions: TransactionStripped[]): { prioritized: string[], deprioritized: string[] } {
+export function identifyPrioritizedTransactions(
+  transactions: TransactionStripped[]
+): { prioritized: string[]; deprioritized: string[] } {
   // find the longest increasing subsequence of transactions
   // (adapted from https://en.wikipedia.org/wiki/Longest_increasing_subsequence#Efficient_algorithms)
   // should be O(n log n)
@@ -780,7 +923,8 @@ export function identifyPrioritizedTransactions(transactions: TransactionStrippe
       const mid = lo + Math.floor((hi - lo) / 2); // lo <= mid < hi
       if (X[M[mid]].rate > X[i].rate) {
         hi = mid;
-      } else { // if X[M[mid]].effectiveFeePerVsize < X[i].effectiveFeePerVsize
+      } else {
+        // if X[M[mid]].effectiveFeePerVsize < X[i].effectiveFeePerVsize
         lo = mid + 1;
       }
     }
@@ -839,7 +983,6 @@ export function identifyPrioritizedTransactions(transactions: TransactionStrippe
 // Adapted from mempool backend https://github.com/mempool/mempool/blob/14e49126c3ca8416a8d7ad134a95c5e090324d69/backend/src/api/transaction-utils.ts#L254
 // Converts hex bitcoin script to ASM
 function convertScriptSigAsm(hex: string): string {
-
   const buf = new Uint8Array(hex.length / 2);
   for (let i = 0; i < buf.length; i++) {
     buf[i] = parseInt(hex.substr(i * 2, 2), 16);
@@ -862,7 +1005,8 @@ function convertScriptSigAsm(hex: string): string {
         b.push('OP_PUSHDATA2');
         i += 2;
       } else if (op === 0x4e) {
-        push = buf[i] | (buf[i + 1] << 8) | (buf[i + 2] << 16) | (buf[i + 3] << 24);
+        push =
+          buf[i] | (buf[i + 1] << 8) | (buf[i + 2] << 16) | (buf[i + 3] << 24);
         b.push('OP_PUSHDATA4');
         i += 4;
       } else {
@@ -964,7 +1108,11 @@ export function addInnerScriptsToVin(vin: Vin): void {
  * @param inputs Additional information from a PSBT, if available
  * @returns The decoded transaction object and the raw hex
  */
-function fromBuffer(buffer: Uint8Array, network: string, inputs?: { key: Uint8Array; value: Uint8Array }[][]): { tx: Transaction, hex: string } {
+function fromBuffer(
+  buffer: Uint8Array,
+  network: string,
+  inputs?: { key: Uint8Array; value: Uint8Array }[][]
+): { tx: Transaction; hex: string } {
   let offset = 0;
 
   // Parse raw transaction
@@ -974,9 +1122,9 @@ function fromBuffer(buffer: Uint8Array, network: string, inputs?: { key: Uint8Ar
       block_height: null,
       block_hash: null,
       block_time: null,
-    }
+    },
   } as Transaction;
-  
+
   [tx.version, offset] = readInt32(buffer, offset);
 
   let marker, flag;
@@ -1006,7 +1154,15 @@ function fromBuffer(buffer: Uint8Array, network: string, inputs?: { key: Uint8Ar
     [sequence, offset] = readInt32(buffer, offset, true);
     const is_coinbase = txid === '0'.repeat(64);
     const scriptsig_asm = convertScriptSigAsm(scriptsig);
-    tx.vin.push({ txid, vout, scriptsig, sequence, is_coinbase, scriptsig_asm, prevout: null });
+    tx.vin.push({
+      txid,
+      vout,
+      scriptsig,
+      sequence,
+      is_coinbase,
+      scriptsig_asm,
+      prevout: null,
+    });
   }
 
   let voutLen;
@@ -1022,7 +1178,14 @@ function fromBuffer(buffer: Uint8Array, network: string, inputs?: { key: Uint8Ar
     const toAddress = scriptPubKeyToAddress(scriptpubkey, network);
     const scriptpubkey_type = toAddress.type;
     const scriptpubkey_address = toAddress?.address;
-    tx.vout.push({ value, scriptpubkey, scriptpubkey_asm, scriptpubkey_type, scriptpubkey_address });
+    tx.vout.push({
+      value,
+      scriptpubkey,
+      scriptpubkey_asm,
+      scriptpubkey_type,
+      scriptpubkey_address,
+      data: '',
+    });
   }
 
   if (!isLegacyTransaction) {
@@ -1038,7 +1201,7 @@ function fromBuffer(buffer: Uint8Array, network: string, inputs?: { key: Uint8Ar
   if (offset !== buffer.length) {
     throw new Error('Transaction has unexpected data');
   }
-  
+
   // Optionally add data from PSBT: prevouts, redeem/witness scripts and signatures
   if (inputs) {
     for (let i = 0; i < tx.vin.length; i++) {
@@ -1052,7 +1215,7 @@ function fromBuffer(buffer: Uint8Array, network: string, inputs?: { key: Uint8Ar
         finalScriptWitness: null,
         redeemScript: null,
         witnessScript: null,
-        partialSigs: []
+        partialSigs: [],
       };
 
       for (const record of inputRecords) {
@@ -1083,16 +1246,32 @@ function fromBuffer(buffer: Uint8Array, network: string, inputs?: { key: Uint8Ar
 
       // Fill prevout
       if (groups.witnessUtxo && !vin.prevout) {
-        let value, scriptpubkeyArray, scriptpubkey, outputOffset = 0;
-        [value, outputOffset] = readInt64(groups.witnessUtxo.value, outputOffset);
+        let value,
+          scriptpubkeyArray,
+          scriptpubkey,
+          outputOffset = 0;
+        [value, outputOffset] = readInt64(
+          groups.witnessUtxo.value,
+          outputOffset
+        );
         value = Number(value);
-        [scriptpubkeyArray, outputOffset] = readVarSlice(groups.witnessUtxo.value, outputOffset);
+        [scriptpubkeyArray, outputOffset] = readVarSlice(
+          groups.witnessUtxo.value,
+          outputOffset
+        );
         scriptpubkey = uint8ArrayToHexString(scriptpubkeyArray);
         const scriptpubkey_asm = convertScriptSigAsm(scriptpubkey);
         const toAddress = scriptPubKeyToAddress(scriptpubkey, network);
         const scriptpubkey_type = toAddress.type;
         const scriptpubkey_address = toAddress?.address;
-        vin.prevout = { value, scriptpubkey, scriptpubkey_asm, scriptpubkey_type, scriptpubkey_address };
+        vin.prevout = {
+          value,
+          scriptpubkey,
+          scriptpubkey_asm,
+          scriptpubkey_type,
+          scriptpubkey_address,
+          data: '',
+        };
       }
       if (groups.nonWitnessUtxo && !vin.prevout) {
         const utxoTx = fromBuffer(groups.nonWitnessUtxo.value, network).tx;
@@ -1110,7 +1289,10 @@ function fromBuffer(buffer: Uint8Array, network: string, inputs?: { key: Uint8Ar
       if (groups.finalScriptWitness) {
         let witness = [];
         let witnessOffset = 0;
-        [witness, witnessOffset] = readVector(groups.finalScriptWitness.value, witnessOffset);
+        [witness, witnessOffset] = readVector(
+          groups.finalScriptWitness.value,
+          witnessOffset
+        );
         vin.witness = witness.map(uint8ArrayToHexString);
         finalizedWitness = true;
       }
@@ -1122,7 +1304,7 @@ function fromBuffer(buffer: Uint8Array, network: string, inputs?: { key: Uint8Ar
       if (groups.redeemScript && !finalizedScriptSig) {
         const redeemScript = groups.redeemScript.value;
         if (redeemScript.length > 520) {
-          throw new Error("Redeem script must be <= 520 bytes");
+          throw new Error('Redeem script must be <= 520 bytes');
         }
         let pushOpcode;
         if (redeemScript.length < 0x4c) {
@@ -1130,15 +1312,23 @@ function fromBuffer(buffer: Uint8Array, network: string, inputs?: { key: Uint8Ar
         } else if (redeemScript.length <= 0xff) {
           pushOpcode = new Uint8Array([0x4c, redeemScript.length]); // OP_PUSHDATA1
         } else {
-          pushOpcode = new Uint8Array([0x4d, redeemScript.length & 0xff, redeemScript.length >> 8]); // OP_PUSHDATA2
+          pushOpcode = new Uint8Array([
+            0x4d,
+            redeemScript.length & 0xff,
+            redeemScript.length >> 8,
+          ]); // OP_PUSHDATA2
         }
-        vin.scriptsig = (vin.scriptsig || '') + uint8ArrayToHexString(pushOpcode) + uint8ArrayToHexString(redeemScript);
+        vin.scriptsig =
+          (vin.scriptsig || '') +
+          uint8ArrayToHexString(pushOpcode) +
+          uint8ArrayToHexString(redeemScript);
         vin.scriptsig_asm = convertScriptSigAsm(vin.scriptsig);
       }
       if (groups.witnessScript && !finalizedWitness) {
-        vin.witness = (vin.witness || []).concat(uint8ArrayToHexString(groups.witnessScript.value));
+        vin.witness = (vin.witness || []).concat(
+          uint8ArrayToHexString(groups.witnessScript.value)
+        );
       }
-
 
       // Fill partial signatures
       for (const record of groups.partialSigs) {
@@ -1148,8 +1338,14 @@ function fromBuffer(buffer: Uint8Array, network: string, inputs?: { key: Uint8Ar
           vin.witness.unshift(uint8ArrayToHexString(record.value));
         }
         if (scriptpubkey_type === 'p2sh') {
-          const redeemScriptStr = vin.scriptsig_asm ? vin.scriptsig_asm.split(' ').reverse()[0] : '';
-          if (redeemScriptStr.startsWith('00') && redeemScriptStr.length === 68 && vin.witness?.length) {
+          const redeemScriptStr = vin.scriptsig_asm
+            ? vin.scriptsig_asm.split(' ').reverse()[0]
+            : '';
+          if (
+            redeemScriptStr.startsWith('00') &&
+            redeemScriptStr.length === 68 &&
+            vin.witness?.length
+          ) {
             if (!finalizedWitness) {
               vin.witness.unshift(uint8ArrayToHexString(record.value));
             }
@@ -1157,20 +1353,23 @@ function fromBuffer(buffer: Uint8Array, network: string, inputs?: { key: Uint8Ar
             if (!finalizedScriptSig) {
               const signature = record.value;
               if (signature.length > 73) {
-                throw new Error("Signature must be <= 73 bytes");
+                throw new Error('Signature must be <= 73 bytes');
               }
               const pushOpcode = new Uint8Array([signature.length]);
-              vin.scriptsig = uint8ArrayToHexString(pushOpcode) + uint8ArrayToHexString(signature) + (vin.scriptsig || '');
+              vin.scriptsig =
+                uint8ArrayToHexString(pushOpcode) +
+                uint8ArrayToHexString(signature) +
+                (vin.scriptsig || '');
               vin.scriptsig_asm = convertScriptSigAsm(vin.scriptsig);
             }
           }
         }
       }
-    }    
+    }
   }
 
   // Calculate final size, weight, and txid
-  const hasWitness = tx.vin.some(vin => vin.witness?.length);
+  const hasWitness = tx.vin.some((vin) => vin.witness?.length);
   let witnessSize = 0;
   if (hasWitness) {
     for (let i = 0; i < tx.vin.length; ++i) {
@@ -1200,14 +1399,17 @@ function fromBuffer(buffer: Uint8Array, network: string, inputs?: { key: Uint8Ar
  *   - the unsigned transaction from a PSBT (txHex)
  *   - the full input map for each input in to fill signatures and prevouts later (inputs)
  */
-function decodePsbt(psbtBuffer: Uint8Array): { rawTx: Uint8Array; inputs: { key: Uint8Array; value: Uint8Array }[][] } {
+function decodePsbt(psbtBuffer: Uint8Array): {
+  rawTx: Uint8Array;
+  inputs: { key: Uint8Array; value: Uint8Array }[][];
+} {
   let offset = 0;
 
   // magic: "psbt" in ASCII
   const expectedMagic = [0x70, 0x73, 0x62, 0x74];
   for (let i = 0; i < expectedMagic.length; i++) {
     if (psbtBuffer[offset + i] !== expectedMagic[i]) {
-      throw new Error("Invalid PSBT magic bytes");
+      throw new Error('Invalid PSBT magic bytes');
     }
   }
   offset += expectedMagic.length;
@@ -1215,7 +1417,7 @@ function decodePsbt(psbtBuffer: Uint8Array): { rawTx: Uint8Array; inputs: { key:
   const separator = psbtBuffer[offset];
   offset += 1;
   if (separator !== 0xff) {
-    throw new Error("Invalid PSBT separator");
+    throw new Error('Invalid PSBT separator');
   }
 
   // GLOBAL MAP
@@ -1241,7 +1443,7 @@ function decodePsbt(psbtBuffer: Uint8Array): { rawTx: Uint8Array; inputs: { key:
   }
 
   if (!rawTx) {
-    throw new Error("Unsigned transaction not found in PSBT");
+    throw new Error('Unsigned transaction not found in PSBT');
   }
 
   let numInputs: number;
@@ -1289,7 +1491,10 @@ function decodePsbt(psbtBuffer: Uint8Array): { rawTx: Uint8Array; inputs: { key:
   return { rawTx, inputs };
 }
 
-export function decodeRawTransaction(input: string, network: string): { tx: Transaction, hex: string } {
+export function decodeRawTransaction(
+  input: string,
+  network: string
+): { tx: Transaction; hex: string } {
   if (!input.length) {
     throw new Error('Empty input');
   }
@@ -1297,13 +1502,23 @@ export function decodeRawTransaction(input: string, network: string): { tx: Tran
   let buffer: Uint8Array;
   if (input.length % 2 === 0 && /^[0-9a-fA-F]+$/.test(input)) {
     buffer = hexStringToUint8Array(input);
-  } else if (/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}(?:==)|[A-Za-z0-9+/]{3}=)?$/.test(input)) {
+  } else if (
+    /^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}(?:==)|[A-Za-z0-9+/]{3}=)?$/.test(
+      input
+    )
+  ) {
     buffer = base64ToUint8Array(input);
   } else {
     throw new Error('Invalid input: not a valid transaction or PSBT');
   }
 
-  if (buffer[0] === 0x70 && buffer[1] === 0x73 && buffer[2] === 0x62 && buffer[3] === 0x74) { // PSBT magic bytes
+  if (
+    buffer[0] === 0x70 &&
+    buffer[1] === 0x73 &&
+    buffer[2] === 0x62 &&
+    buffer[3] === 0x74
+  ) {
+    // PSBT magic bytes
     const { rawTx, inputs } = decodePsbt(buffer);
     return fromBuffer(rawTx, network, inputs);
   }
@@ -1311,7 +1526,10 @@ export function decodeRawTransaction(input: string, network: string): { tx: Tran
   return fromBuffer(buffer, network);
 }
 
-function serializeTransaction(tx: Transaction, includeWitness: boolean = true): Uint8Array {
+function serializeTransaction(
+  tx: Transaction,
+  includeWitness: boolean = true
+): Uint8Array {
   const result: number[] = [];
 
   // Add version
@@ -1377,15 +1595,25 @@ export function countSigops(transaction: Transaction): number {
     }
     if (input.prevout) {
       switch (true) {
-        case input.prevout.scriptpubkey_type === 'p2sh' && input.witness?.length === 2 && input.scriptsig && input.scriptsig.startsWith('160014'):
+        case input.prevout.scriptpubkey_type === 'p2sh' &&
+          input.witness?.length === 2 &&
+          input.scriptsig &&
+          input.scriptsig.startsWith('160014'):
         case input.prevout.scriptpubkey_type === 'v0_p2wpkh':
           sigops += 1;
           break;
 
-        case input.prevout?.scriptpubkey_type === 'p2sh' && input.witness?.length && input.scriptsig && input.scriptsig.startsWith('220020'):
+        case input.prevout?.scriptpubkey_type === 'p2sh' &&
+          input.witness?.length &&
+          input.scriptsig &&
+          input.scriptsig.startsWith('220020'):
         case input.prevout.scriptpubkey_type === 'v0_p2wsh':
           if (input.witness?.length) {
-            sigops += countScriptSigops(convertScriptSigAsm(input.witness[input.witness.length - 1]), false, true);
+            sigops += countScriptSigops(
+              convertScriptSigAsm(input.witness[input.witness.length - 1]),
+              false,
+              true
+            );
           }
           break;
 
@@ -1407,30 +1635,51 @@ export function countSigops(transaction: Transaction): number {
   return sigops;
 }
 
-function scriptPubKeyToAddress(scriptPubKey: string, network: string): { address: string, type: string } {
+function scriptPubKeyToAddress(
+  scriptPubKey: string,
+  network: string
+): { address: string; type: string } {
   // P2PKH
   if (/^76a914[0-9a-f]{40}88ac$/.test(scriptPubKey)) {
-    return { address: p2pkh(scriptPubKey.substring(6, 6 + 40), network), type: 'p2pkh' };
+    return {
+      address: p2pkh(scriptPubKey.substring(6, 6 + 40), network),
+      type: 'p2pkh',
+    };
   }
   // P2PK
-  if (/^21[0-9a-f]{66}ac$/.test(scriptPubKey) || /^41[0-9a-f]{130}ac$/.test(scriptPubKey)) {
+  if (
+    /^21[0-9a-f]{66}ac$/.test(scriptPubKey) ||
+    /^41[0-9a-f]{130}ac$/.test(scriptPubKey)
+  ) {
     return { address: null, type: 'p2pk' };
   }
   // P2SH
   if (/^a914[0-9a-f]{40}87$/.test(scriptPubKey)) {
-    return { address: p2sh(scriptPubKey.substring(4, 4 + 40), network), type: 'p2sh' };
+    return {
+      address: p2sh(scriptPubKey.substring(4, 4 + 40), network),
+      type: 'p2sh',
+    };
   }
   // P2WPKH
   if (/^0014[0-9a-f]{40}$/.test(scriptPubKey)) {
-    return { address: p2wpkh(scriptPubKey.substring(4, 4 + 40), network), type: 'v0_p2wpkh' };
+    return {
+      address: p2wpkh(scriptPubKey.substring(4, 4 + 40), network),
+      type: 'v0_p2wpkh',
+    };
   }
   // P2WSH
   if (/^0020[0-9a-f]{64}$/.test(scriptPubKey)) {
-    return { address: p2wsh(scriptPubKey.substring(4, 4 + 64), network), type: 'v0_p2wsh' };
+    return {
+      address: p2wsh(scriptPubKey.substring(4, 4 + 64), network),
+      type: 'v0_p2wsh',
+    };
   }
   // P2TR
   if (/^5120[0-9a-f]{64}$/.test(scriptPubKey)) {
-    return { address: p2tr(scriptPubKey.substring(4, 4 + 64), network), type: 'v1_p2tr' };
+    return {
+      address: p2tr(scriptPubKey.substring(4, 4 + 64), network),
+      type: 'v1_p2tr',
+    };
   }
   // multisig
   if (/^[0-9a-f]+ae$/.test(scriptPubKey)) {
@@ -1449,7 +1698,9 @@ function scriptPubKeyToAddress(scriptPubKey: string, network: string): { address
 
 function p2pkh(pubKeyHash: string, network: string): string {
   const pubkeyHashArray = hexStringToUint8Array(pubKeyHash);
-  const version = ['testnet', 'testnet4', 'signet'].includes(network) ? 0x6f : 0x00;
+  const version = ['testnet', 'testnet4', 'signet'].includes(network)
+    ? 0x6f
+    : 0x00;
   const versionedPayload = Uint8Array.from([version, ...pubkeyHashArray]);
   const hash1 = new Hash().update(versionedPayload).digest();
   const hash2 = new Hash().update(hash1).digest();
@@ -1461,7 +1712,9 @@ function p2pkh(pubKeyHash: string, network: string): string {
 
 function p2sh(scriptHash: string, network: string): string {
   const scriptHashArray = hexStringToUint8Array(scriptHash);
-  const version = ['testnet', 'testnet4', 'signet'].includes(network) ? 0xc4 : 0x05;
+  const version = ['testnet', 'testnet4', 'signet'].includes(network)
+    ? 0xc4
+    : 0x05;
   const versionedPayload = Uint8Array.from([version, ...scriptHashArray]);
   const hash1 = new Hash().update(versionedPayload).digest();
   const hash2 = new Hash().update(hash1).digest();
@@ -1509,15 +1762,16 @@ function p2a(network: string): string {
 
 // base58 encoding
 function base58Encode(data: Uint8Array): string {
-  const BASE58_ALPHABET = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
+  const BASE58_ALPHABET =
+    '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
 
   let hexString = Array.from(data)
-    .map(byte => byte.toString(16).padStart(2, '0'))
+    .map((byte) => byte.toString(16).padStart(2, '0'))
     .join('');
-  
-  let num = BigInt("0x" + hexString);
 
-  let encoded = "";
+  let num = BigInt('0x' + hexString);
+
+  let encoded = '';
   while (num > 0) {
     const remainder = Number(num % 58n);
     num = num / 58n;
@@ -1526,7 +1780,7 @@ function base58Encode(data: Uint8Array): string {
 
   for (let byte of data) {
     if (byte === 0) {
-      encoded = "1" + encoded;
+      encoded = '1' + encoded;
     } else {
       break;
     }
@@ -1538,7 +1792,7 @@ function base58Encode(data: Uint8Array): string {
 // bech32 encoding
 // Adapted from https://github.com/bitcoinjs/bech32/blob/5ceb0e3d4625561a459c85643ca6947739b2d83c/src/index.ts
 function bech32Encode(prefix: string, words: number[], constant: number = 1) {
-  const BECH32_ALPHABET = "qpzry9x8gf2tvdw0s3jn54khce6mua7l";
+  const BECH32_ALPHABET = 'qpzry9x8gf2tvdw0s3jn54khce6mua7l';
 
   const checksum = createChecksum(prefix, words, constant);
   const combined = words.concat(checksum);
@@ -1550,7 +1804,9 @@ function bech32Encode(prefix: string, words: number[], constant: number = 1) {
 }
 
 function polymodStep(pre) {
-  const GENERATORS = [0x3b6a57b2, 0x26508e6d, 0x1ea119fa, 0x3d4233dd, 0x2a1462b3];
+  const GENERATORS = [
+    0x3b6a57b2, 0x26508e6d, 0x1ea119fa, 0x3d4233dd, 0x2a1462b3,
+  ];
   const b = pre >> 25;
   return (
     ((pre & 0x1ffffff) << 5) ^
@@ -1615,7 +1871,7 @@ function convertBits(data, fromBits, toBits, pad) {
     if (bits > 0) {
       ret.push((acc << (toBits - bits)) & maxV);
     }
-  } else if (bits >= fromBits || ((acc << (toBits - bits)) & maxV)) {
+  } else if (bits >= fromBits || (acc << (toBits - bits)) & maxV) {
     throw new Error('Invalid data');
   }
   return ret;
@@ -1627,7 +1883,9 @@ function toWords(bytes) {
 
 // Helper functions
 export function uint8ArrayToHexString(uint8Array: Uint8Array): string {
-  return Array.from(uint8Array).map(byte => byte.toString(16).padStart(2, '0')).join('');
+  return Array.from(uint8Array)
+    .map((byte) => byte.toString(16).padStart(2, '0'))
+    .join('');
 }
 
 export function hexStringToUint8Array(hex: string): Uint8Array {
@@ -1640,7 +1898,7 @@ export function hexStringToUint8Array(hex: string): Uint8Array {
 
 function base64ToUint8Array(base64: string): Uint8Array {
   const binaryString = atob(base64);
-  return new Uint8Array([...binaryString].map(char => char.charCodeAt(0)));
+  return new Uint8Array([...binaryString].map((char) => char.charCodeAt(0)));
 }
 
 function intToBytes(value: number, byteLength: number): number[] {
@@ -1699,11 +1957,19 @@ function readInt16(buffer: Uint8Array, offset: number): [number, number] {
   return [buffer[offset] | (buffer[offset + 1] << 8), offset + 2];
 }
 
-function readInt32(buffer: Uint8Array, offset: number, unsigned: boolean = false): [number, number] {
+function readInt32(
+  buffer: Uint8Array,
+  offset: number,
+  unsigned: boolean = false
+): [number, number] {
   if (offset + 4 > buffer.length) {
     throw new Error('Buffer out of bounds');
   }
-  const value = buffer[offset] | (buffer[offset + 1] << 8) | (buffer[offset + 2] << 16) | (buffer[offset + 3] << 24);
+  const value =
+    buffer[offset] |
+    (buffer[offset + 1] << 8) |
+    (buffer[offset + 2] << 16) |
+    (buffer[offset + 3] << 24);
   return [unsigned ? value >>> 0 : value, offset + 4];
 }
 
@@ -1711,8 +1977,18 @@ function readInt64(buffer: Uint8Array, offset: number): [bigint, number] {
   if (offset + 8 > buffer.length) {
     throw new Error('Buffer out of bounds');
   }
-  const low = BigInt(buffer[offset] | (buffer[offset + 1] << 8) | (buffer[offset + 2] << 16) | (buffer[offset + 3] << 24));
-  const high = BigInt(buffer[offset + 4] | (buffer[offset + 5] << 8) | (buffer[offset + 6] << 16) | (buffer[offset + 7] << 24));
+  const low = BigInt(
+    buffer[offset] |
+      (buffer[offset + 1] << 8) |
+      (buffer[offset + 2] << 16) |
+      (buffer[offset + 3] << 24)
+  );
+  const high = BigInt(
+    buffer[offset + 4] |
+      (buffer[offset + 5] << 8) |
+      (buffer[offset + 6] << 16) |
+      (buffer[offset + 7] << 24)
+  );
   return [(high << 32n) | (low & 0xffffffffn), offset + 8];
 }
 
@@ -1729,17 +2005,21 @@ function readVarInt(buffer: Uint8Array, offset: number): [number, number] {
     const [bigValue, nextOffset] = readInt64(buffer, newOffset);
 
     if (bigValue > Number.MAX_SAFE_INTEGER) {
-      throw new Error("VarInt exceeds safe integer range");
+      throw new Error('VarInt exceeds safe integer range');
     }
 
     const numValue = Number(bigValue);
     return [numValue, nextOffset];
   } else {
-    throw new Error("Invalid VarInt prefix");
+    throw new Error('Invalid VarInt prefix');
   }
 }
 
-function readSlice(buffer: Uint8Array, offset: number, n: number | bigint): [Uint8Array, number] {
+function readSlice(
+  buffer: Uint8Array,
+  offset: number,
+  n: number | bigint
+): [Uint8Array, number] {
   const length = Number(n);
   if (offset + length > buffer.length) {
     throw new Error('Cannot read slice out of bounds');
@@ -1748,12 +2028,18 @@ function readSlice(buffer: Uint8Array, offset: number, n: number | bigint): [Uin
   return [slice, offset + length];
 }
 
-function readVarSlice(buffer: Uint8Array, offset: number): [Uint8Array, number] {
+function readVarSlice(
+  buffer: Uint8Array,
+  offset: number
+): [Uint8Array, number] {
   const [length, newOffset] = readVarInt(buffer, offset);
   return readSlice(buffer, newOffset, length);
 }
 
-function readVector(buffer: Uint8Array, offset: number): [Uint8Array[], number] {
+function readVector(
+  buffer: Uint8Array,
+  offset: number
+): [Uint8Array[], number] {
   const [count, newOffset] = readVarInt(buffer, offset);
   let updatedOffset = newOffset;
   const vector: Uint8Array[] = [];
@@ -1771,7 +2057,15 @@ function readVector(buffer: Uint8Array, offset: number): [Uint8Array[], number] 
 export function taggedHash(tag: string, dataHex: string): string {
   const encoder = new TextEncoder();
   const tagHash = hash(encoder.encode(tag));
-  return uint8ArrayToHexString(hash(new Uint8Array([...tagHash, ...tagHash, ...hexStringToUint8Array(dataHex)])));
+  return uint8ArrayToHexString(
+    hash(
+      new Uint8Array([
+        ...tagHash,
+        ...tagHash,
+        ...hexStringToUint8Array(dataHex),
+      ])
+    )
+  );
 }
 
 export function compactSize(n: number): Uint8Array {
@@ -1780,7 +2074,13 @@ export function compactSize(n: number): Uint8Array {
   } else if (n <= 0xffff) {
     return new Uint8Array([0xfd, n & 0xff, (n >> 8) & 0xff]);
   } else if (n <= 0xffffffff) {
-    return new Uint8Array([0xfe, n & 0xff, (n >> 8) & 0xff, (n >> 16) & 0xff, (n >> 24) & 0xff]);
+    return new Uint8Array([
+      0xfe,
+      n & 0xff,
+      (n >> 8) & 0xff,
+      (n >> 16) & 0xff,
+      (n >> 24) & 0xff,
+    ]);
   } else {
     const buffer = new Uint8Array(9);
     buffer[0] = 0xff;
