@@ -169,84 +169,9 @@
                           <td style="text-align: left;">{{ vin.scriptsig }}</td>
                         </tr>
                       </ng-template>
-                      <tr *ngIf="vin.witness" class="vin-witness">
-                        <td i18n="transactions-list.witness">Witness</td>
-                        <td style="text-align: left;">
-                          <ng-container *ngFor="let witness of vin.witness; index as windex">
-                            <p class="witness-item">
-                              <ng-container *ngIf="tx['_sigmap']?.[witness] as sigInfo">
-                                <span class="sig sig-key sig-inline sighash-{{sigInfo.sig.sighash}}"
-                                      [class.hovered]="selectedSig && selectedSig.txIndex === i && selectedSig.vindex === vindex && selectedSig.sig === sigInfo.sig"
-                                      (mouseenter)="showSigInfo(i, vindex, sigInfo.sig)"
-                                      (mouseleave)="hideSigInfo()"
-                                      [ngbTooltip]="sighashLabels[sigInfo.sig.sighash]">
-                                  <fa-icon [icon]="['fas', 'key']" [fixedWidth]="true"></fa-icon>
-                                </span>
-                              </ng-container>
-                              @if (vin.witness.length > 1 && windex === vin.witness.length - 1 && witness.slice(0, 2) === '50') {
-                                <span class="annex" ngbTooltip="annex">
-                                  <fa-icon [icon]="['fas', 'paperclip']" [fixedWidth]="true"></fa-icon>
-                                </span>
-                              }
-                              @if (witness.length > 1000) {
-                                @if (!showFullWitness[vindex][windex]) {
-                                  {{ witness | slice:0:1000 }}
-                                } @else {
-                                  {{ witness }}
-                                }
-                              } @else if (witness) {
-                                <ng-container *ngIf="tx['_sigmap']?.[witness]?.sig.sighash !== 0 && tx['_sigmap']?.[witness] as sigInfo; else plainSig">
-                                  <span class="witness">
-                                    {{witness.slice(0, -2)}}<span class="sig sighash-{{sigInfo.sig.sighash}}"
-                                          [class.hovered]="selectedSig && selectedSig.txIndex === i && selectedSig.vindex === vindex && selectedSig.sig === sigInfo.sig"
-                                          (mouseenter)="showSigInfo(i, vindex, sigInfo.sig)"
-                                          (mouseleave)="hideSigInfo()"
-                                          [ngbTooltip]="sighashLabels[sigInfo.sig.sighash]">{{witness.slice(-2)}}</span>
-                                  </span>
-                                </ng-container>
-                                <ng-template #plainSig>
-                                  {{ witness }}
-                                </ng-template>
-                              } @else {
-                                &lt;empty&gt;
-                              }
-                            </p>
-                            @if (witness.length > 1000) {
-                              <div style="display: flex;">
-                                @if (!showFullWitness[vindex][windex]) {
-                                  <span>...</span>
-                                }
-                                <label class="btn btn-sm btn-primary mt-2" (click)="toggleShowFullWitness(vindex, windex)" style="margin-left: auto;">
-                                  @if (!showFullWitness[vindex][windex]) {
-                                    <span i18n="show-all">Show all</span>
-                                  } @else {
-                                    <span i18n="show-less">Show less</span>
-                                  }
-                                </label>
-                              </div>
-                            }
-                          </ng-container>
-                        </td>
-                      </tr>
                       <tr *ngIf="vin.inner_redeemscript_asm">
                         <td i18n="transactions-list.p2sh-redeem-script">P2SH redeem script</td>
                         <td style="text-align: left;" [innerHTML]="vin.inner_redeemscript_asm | asmStyler"></td>
-                      </tr>
-                      <tr *ngIf="vin.inner_witnessscript_asm">
-                        <td *ngIf="vin.prevout && vin.prevout.scriptpubkey_type == 'v1_p2tr'; else p2wsh" i18n="transactions-list.p2tr-tapscript">P2TR tapscript</td>
-                        <ng-template #p2wsh>
-                          <td i18n="transactions-list.p2wsh-witness-script">P2WSH witness script</td>
-                        </ng-template>
-                        <td style="text-align: left;">
-                          <div [innerHTML]="vin.inner_witnessscript_asm | asmStyler: (showFullScript[vindex] ? 0 : 1000)"></div>
-                          <div *ngIf="vin.inner_witnessscript_asm.length > 1000" style="display: flex;">
-                            <span *ngIf="!showFullScript[vindex]">...</span>
-                            <label class="btn btn-sm btn-primary mt-2" (click)="toggleShowFullScript(vindex)" style="margin-left: auto;">
-                              <span *ngIf="!showFullScript[vindex]" i18n="show-all">Show all</span>
-                              <span *ngIf="showFullScript[vindex]" i18n="show-less">Show less</span>
-                            </label>
-                          </div>
-                        </td>
                       </tr>
                       <tr>
                         <td i18n="transactions-list.nsequence">nSequence</td>
