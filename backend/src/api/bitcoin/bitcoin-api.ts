@@ -14,6 +14,8 @@ import mempool from '../mempool';
 import { TransactionExtended } from '../../mempool.interfaces';
 import transactionUtils from '../transaction-utils';
 import crypto from 'crypto-js';
+import axios from 'axios';
+import config from '../../config';
 
 class BitcoinApi implements AbstractBitcoinApi {
   private rawMempoolCache: IBitcoinApi.RawMempool | null = null;
@@ -33,7 +35,7 @@ class BitcoinApi implements AbstractBitcoinApi {
       nonce: block.nonce,
       difficulty: block.difficulty,
       merkle_root: block.merkleroot,
-      tx_count: block.nTx,
+      tx_count: block.tx.length,
       size: block.size,
       weight: block.weight,
       previousblockhash: block.previousblockhash,
@@ -42,7 +44,7 @@ class BitcoinApi implements AbstractBitcoinApi {
     };
   }
 
-  $getRawTransaction(
+  async $getRawTransaction(
     txId: string,
     skipConversion = false,
     addPrevout = false,
@@ -53,24 +55,27 @@ class BitcoinApi implements AbstractBitcoinApi {
     if (txInMempool && addPrevout) {
       return this.$addPrevouts(txInMempool);
     }
-
-    return this.bitcoindClient
-      .getRawTransaction(txId, true)
-      .then((transaction: IBitcoinApi.Transaction) => {
-        if (skipConversion) {
-          transaction.vout.forEach((vout) => {
-            vout.value = Math.round(vout.value * 100000000);
-          });
-          return transaction;
-        }
-        return this.$convertTransaction(transaction, addPrevout, lazyPrevouts);
-      })
-      .catch((e: Error) => {
-        if (e.message.startsWith('The genesis block coinbase')) {
-          return this.$returnCoinbaseTransaction();
-        }
-        throw e;
-      });
+    try {
+      const tx = await this.bitcoindClient
+        .getRawTransaction(txId, true)
+        .then((transaction: IBitcoinApi.Transaction) => {
+          if (skipConversion) {
+            transaction.vout.forEach((vout) => {
+              vout.value = Math.round(vout.value * 100000000);
+            });
+            return transaction;
+          }
+          return this.$convertTransaction(
+            transaction,
+            addPrevout,
+            lazyPrevouts
+          );
+        });
+      return tx;
+    } catch (e) {
+      const tx = await this.$returnCoinbaseTransaction(txId);
+      return tx;
+    }
   }
 
   async $getRawTransactions(
@@ -126,13 +131,13 @@ class BitcoinApi implements AbstractBitcoinApi {
 
   $getTxIdsForBlock(hash: string): Promise<string[]> {
     return this.bitcoindClient
-      .getBlock(hash, 1)
+      .getBlock(hash, true)
       .then((rpcBlock: IBitcoinApi.Block) => rpcBlock.tx);
   }
 
   async $getTxsForBlock(hash: string): Promise<IEsploraApi.Transaction[]> {
     const verboseBlock: IBitcoinApi.VerboseBlock =
-      await this.bitcoindClient.getBlock(hash, 2);
+      await this.bitcoindClient.getBlock(hash, true);
     const transactions: IEsploraApi.Transaction[] = [];
     for (const tx of verboseBlock.tx) {
       const converted = await this.$convertTransaction(tx, true);
@@ -143,7 +148,7 @@ class BitcoinApi implements AbstractBitcoinApi {
 
   $getRawBlock(hash: string): Promise<Buffer> {
     return this.bitcoindClient
-      .getBlock(hash, 0)
+      .getBlock(hash, false)
       .then((raw: string) => Buffer.from(raw, 'hex'));
   }
 
@@ -266,21 +271,10 @@ class BitcoinApi implements AbstractBitcoinApi {
   }
 
   async $getOutspends(txId: string): Promise<IEsploraApi.Outspend[]> {
-    const outSpends: IEsploraApi.Outspend[] = [];
-    const tx = await this.$getRawTransaction(txId, true, false);
-    for (let i = 0; i < tx.vout.length; i++) {
-      if (tx.status && tx.status.block_height === 0) {
-        outSpends.push({
-          spent: false,
-        });
-      } else {
-        const txOut = await this.bitcoindClient.getTxOut(txId, i);
-        outSpends.push({
-          spent: txOut === null,
-        });
-      }
-    }
-    return outSpends;
+    const resp = await axios.get(
+      config.ESPLORA.REST_API_URL + '/tx/' + txId + '/outspends'
+    );
+    return resp.data;
   }
 
   async $getBatchedOutspends(
@@ -461,17 +455,36 @@ class BitcoinApi implements AbstractBitcoinApi {
     return transaction;
   }
 
-  protected $returnCoinbaseTransaction(): Promise<IEsploraApi.Transaction> {
+  protected $returnCoinbaseTransaction(
+    txId: string
+  ): Promise<IEsploraApi.Transaction> {
     return this.bitcoindClient.getBlockHash(0).then((hash: string) =>
-      this.bitcoindClient.getBlock(hash, 2).then((block: IBitcoinApi.Block) => {
-        return this.$convertTransaction(
-          Object.assign(block.tx[0], {
-            confirmations: blocks.getCurrentBlockHeight() + 1,
-            blocktime: block.time,
-          }),
-          false
-        );
-      })
+      this.bitcoindClient
+        .getBlock(hash, true)
+        .then(async (block: IBitcoinApi.Block) => {
+          // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+          // @ts-ignore
+          if (txId === block.tx[0]) {
+            const blockHex = await this.bitcoindClient.getBlock(hash, false);
+            const txHex = blockHex.slice(162);
+            const tx = await this.bitcoindClient.decodeRawTransaction(txHex);
+            tx.blockhash = hash;
+            const finalTx = await this.$convertTransaction(
+              Object.assign(tx, {
+                confirmations: blocks.getCurrentBlockHeight() + 1,
+                blocktime: block.time,
+                hex: txHex,
+              }),
+              false
+            );
+            finalTx.hex = txHex;
+            return finalTx;
+          } else {
+            throw Error(
+              'No such mempool or blockchain transaction. Use gettransaction for wallet transactions.'
+            );
+          }
+        })
     );
   }
 

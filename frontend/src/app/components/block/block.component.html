@@ -54,10 +54,6 @@
                 <td i18n="block.size">Size</td>
                 <td [innerHTML]="'&lrm;' + (block.size | bytes: 2)"></td>
               </tr>
-              <tr>
-                <td i18n="block.weight">Weight</td>
-                <td [innerHTML]="'&lrm;' + (block.weight | wuBytes: 2)"></td>
-              </tr>
               <tr *ngIf="auditAvailable">
                 <td><ng-container i18n="latest-blocks.health">Health</ng-container><a class="info-link" [routerLink]="['/docs/faq' | relativeUrl ]" fragment="what-is-block-health"><fa-icon [icon]="['fas', 'info-circle']" [fixedWidth]="true"></fa-icon></a></td>
                 <td>
@@ -346,7 +342,7 @@
         </div>
         <div class="clearfix"></div>
         <div class="tx-skeleton">
-  
+
           <div class="header-bg box">
             <span class="skeleton-loader"></span>
           </div>

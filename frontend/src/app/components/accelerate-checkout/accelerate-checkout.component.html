@@ -118,7 +118,7 @@
                         <td class="amt" style="font-size: 16px">
                           {{ estimate.targetFeeRate | number : '1.0-0' }}
                         </td>
-                        <td class="units"><span class="symbol" i18n="shared.sat-vbyte|sat/vB">sat/vB</span></td>
+                        <td class="units"><span class="symbol" i18n="shared.sat-vbyte|sat/b">sat/b</span></td>
                       </tr>
                       <tr class="info">
                         <td class="info">
@@ -140,7 +140,7 @@
                         <td class="amt" style="font-size: 16px">
                           {{ maxRateOptions[selectFeeRateIndex].rate | number : '1.0-0' }}
                         </td>
-                        <td class="units"><span class="symbol" i18n="shared.sat-vbyte|sat/vB">sat/vB</span></td>
+                        <td class="units"><span class="symbol" i18n="shared.sat-vbyte|sat/b">sat/b</span></td>
                       </tr>
                       <tr class="info">
                         <td class="info">
@@ -190,7 +190,7 @@
                   <ng-container *ngIf="hasAccessToBalanceMode">
                     <tr class="group-first">
                       <td class="item">
-                        <b style="background-color: #5E35B1" class="p-1 pl-0" i18n="accelerator.estimated-cost">Estimated acceleration cost</b> ~{{ estimate.targetFeeRate | number : '1.0-0' }} sat/vB
+                        <b style="background-color: #5E35B1" class="p-1 pl-0" i18n="accelerator.estimated-cost">Estimated acceleration cost</b> ~{{ estimate.targetFeeRate | number : '1.0-0' }} sat/b
                       </td>
                       <td class="amt">
                         <span style="background-color: #5E35B1" class="p-1 pl-0">
@@ -494,7 +494,7 @@
         <div class="form-group w-100">
           @if (step === 'applepay') {
             <div id="apple-pay-button" class="apple-pay-button apple-pay-button-black" style="height: 50px"  [style]="loadingApplePay ? 'opacity: 0; width: 0px; height: 0px; pointer-events: none;' : ''"></div>
-          } @else if (step === 'cashapp') {          
+          } @else if (step === 'cashapp') {
             <div id="cash-app-pay" class="d-inline-block" style="height: 50px" [style]="loadingCashapp ? 'opacity: 0; width: 0px; height: 0px; pointer-events: none;' : ''"></div>
           } @else if (step === 'googlepay') {
             <div id="google-pay-button" class="d-inline-block" style="height: 50px" [style]="loadingGooglePay ? 'opacity: 0; width: 0px; height: 0px; pointer-events: none;' : ''"></div>
@@ -583,7 +583,7 @@
     <div class="row text-center mt-1">
       <div class="col-sm">
         <div class="d-flex flex-row justify-content-center align-items-center">
-          @if (accelerationResponse) {        
+          @if (accelerationResponse) {
             <span i18n="accelerator.confirmed-acceleration-with-miners">Your transaction has been accepted for acceleration by our mining pool partners.</span>
           } @else {
             <span i18n="accelerator.confirmed-acceleration-with-miners-third-party">Transaction has already been accepted for acceleration by our mining pool partners.</span>
@@ -620,7 +620,7 @@
   <button type="button" *ngIf="advancedEnabled" class="btn btn-sm btn-outline-info btn-small-height ml-2" (click)="moveToStep('quote')" i18n="accelerator.customize">customize</button>
 </ng-template>
 
-<ng-template id="accelerate-to" #accelerateTo let-x i18n="accelerator.accelerate-to-x">Accelerate to ~{{ x | number : '1.0-0' }} sat/vB</ng-template>
+<ng-template id="accelerate-to" #accelerateTo let-x i18n="accelerator.accelerate-to-x">Accelerate to ~{{ x | number : '1.0-0' }} sat/b</ng-template>
 
 <ng-template #accelerateButton>
   <div class="position-relative">
