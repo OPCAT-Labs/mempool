@@ -1,12 +1,36 @@
-import { Component, OnInit, HostListener, ViewChild, ElementRef, OnDestroy } from '@angular/core';
+import {
+  Component,
+  OnInit,
+  HostListener,
+  ViewChild,
+  ElementRef,
+  OnDestroy,
+} from '@angular/core';
 import { Transaction, Vout } from '@interfaces/electrs.interface';
 import { StateService } from '../../services/state.service';
 import { Filter, toFilters } from '../../shared/filters.utils';
-import { decodeRawTransaction, getTransactionFlags, addInnerScriptsToVin, countSigops } from '../../shared/transaction.utils';
-import { catchError, firstValueFrom, Subscription, switchMap, tap, throwError, timer } from 'rxjs';
+import {
+  decodeRawTransaction,
+  getTransactionFlags,
+  addInnerScriptsToVin,
+  countSigops,
+} from '../../shared/transaction.utils';
+import {
+  catchError,
+  firstValueFrom,
+  Subscription,
+  switchMap,
+  tap,
+  throwError,
+  timer,
+} from 'rxjs';
 import { WebsocketService } from '../../services/websocket.service';
 import { ActivatedRoute, Router } from '@angular/router';
-import { UntypedFormBuilder, UntypedFormGroup, Validators } from '@angular/forms';
+import {
+  UntypedFormBuilder,
+  UntypedFormGroup,
+  Validators,
+} from '@angular/forms';
 import { ElectrsApiService } from '../../services/electrs-api.service';
 import { SeoService } from '../../services/seo.service';
 import { seoDescriptionNetwork } from '@app/shared/common.utils';
@@ -20,7 +44,6 @@ import { CpfpInfo } from '../../interfaces/node-api.interface';
   styleUrls: ['./transaction-raw.component.scss'],
 })
 export class TransactionRawComponent implements OnInit, OnDestroy {
-
   pushTxForm: UntypedFormGroup;
   rawHexTransaction: string;
   isLoading: boolean;
@@ -69,12 +92,18 @@ export class TransactionRawComponent implements OnInit, OnDestroy {
     public formBuilder: UntypedFormBuilder,
     public seoService: SeoService,
     public apiService: ApiService,
-    public relativeUrlPipe: RelativeUrlPipe,
+    public relativeUrlPipe: RelativeUrlPipe
   ) {}
 
   ngOnInit(): void {
-    this.seoService.setTitle($localize`:@@meta.title.preview-tx:Preview Transaction`);
-    this.seoService.setDescription($localize`:@@meta.description.preview-tx:Preview a transaction to the Bitcoin${seoDescriptionNetwork(this.stateService.network)} network using the transaction's raw hex data.`);
+    this.seoService.setTitle(
+      $localize`:@@meta.title.preview-tx:Preview Transaction`
+    );
+    this.seoService.setDescription(
+      $localize`:@@meta.description.preview-tx:Preview a transaction to the Bitcoin${seoDescriptionNetwork(
+        this.stateService.network
+      )} network using the transaction's raw hex data.`
+    );
     this.websocketService.want(['blocks', 'mempool-blocks']);
     this.pushTxForm = this.formBuilder.group({
       txRaw: ['', Validators.required],
@@ -102,7 +131,10 @@ export class TransactionRawComponent implements OnInit, OnDestroy {
     this.resetState();
     this.isLoading = true;
     try {
-      const { tx, hex } = decodeRawTransaction(this.pushTxForm.get('txRaw').value.trim(), this.stateService.network);
+      const { tx, hex } = decodeRawTransaction(
+        this.pushTxForm.get('txRaw').value.trim(),
+        this.stateService.network
+      );
       await this.fetchPrevouts(tx);
       await this.fetchCpfpInfo(tx);
       this.processTransaction(tx, hex);
@@ -114,24 +146,32 @@ export class TransactionRawComponent implements OnInit, OnDestroy {
   }
 
   async fetchPrevouts(transaction: Transaction): Promise<void> {
-    const prevoutsToFetch = transaction.vin.filter(input => !input.prevout).map((input) => ({ txid: input.txid, vout: input.vout }));
+    const prevoutsToFetch = transaction.vin
+      .filter((input) => !input.prevout)
+      .map((input) => ({ txid: input.txid, vout: input.vout }));
 
-    if (!prevoutsToFetch.length || transaction.vin[0].is_coinbase || this.offlineMode) {
-      this.hasPrevouts = !prevoutsToFetch.length || transaction.vin[0].is_coinbase;
+    if (
+      !prevoutsToFetch.length ||
+      transaction.vin[0].is_coinbase ||
+      this.offlineMode
+    ) {
+      this.hasPrevouts =
+        !prevoutsToFetch.length || transaction.vin[0].is_coinbase;
       this.fetchCpfp = this.hasPrevouts && !this.offlineMode;
     } else {
       try {
         this.missingPrevouts = [];
         this.isLoadingPrevouts = true;
 
-        const prevouts: { prevout: Vout, unconfirmed: boolean }[] = await firstValueFrom(this.apiService.getPrevouts$(prevoutsToFetch));
+        const prevouts: { prevout: Vout; unconfirmed: boolean }[] =
+          await firstValueFrom(this.apiService.getPrevouts$(prevoutsToFetch));
 
         if (prevouts?.length !== prevoutsToFetch.length) {
           throw new Error();
         }
 
         let fetchIndex = 0;
-        transaction.vin.forEach(input => {
+        transaction.vin.forEach((input) => {
           if (!input.prevout) {
             const fetched = prevouts[fetchIndex];
             if (fetched) {
@@ -144,12 +184,14 @@ export class TransactionRawComponent implements OnInit, OnDestroy {
         });
 
         if (this.missingPrevouts.length) {
-          throw new Error(`Some prevouts do not exist or are already spent (${this.missingPrevouts.length})`);
+          throw new Error(
+            `Some prevouts do not exist or are already spent (${this.missingPrevouts.length})`
+          );
         }
 
         this.hasPrevouts = true;
         this.isLoadingPrevouts = false;
-        this.fetchCpfp = prevouts.some(prevout => prevout?.unconfirmed);
+        this.fetchCpfp = prevouts.some((prevout) => prevout?.unconfirmed);
       } catch (error) {
         console.log(error);
         this.errorPrevouts = error?.error?.error || error?.message;
@@ -158,12 +200,13 @@ export class TransactionRawComponent implements OnInit, OnDestroy {
     }
 
     if (this.hasPrevouts) {
-      transaction.fee = transaction.vin.some(input => input.is_coinbase)
+      transaction.fee = transaction.vin.some((input) => input.is_coinbase)
         ? 0
         : transaction.vin.reduce((fee, input) => {
-          return fee + (input.prevout?.value || 0);
-        }, 0) - transaction.vout.reduce((sum, output) => sum + output.value, 0);
-      transaction.feePerVsize = transaction.fee / (transaction.weight / 4);
+            return fee + (input.prevout?.value || 0);
+          }, 0) -
+          transaction.vout.reduce((sum, output) => sum + output.value, 0);
+      transaction.feePerVsize = transaction.fee / transaction.size;
     }
 
     transaction.vin.forEach(addInnerScriptsToVin);
@@ -175,14 +218,18 @@ export class TransactionRawComponent implements OnInit, OnDestroy {
     if (this.hasPrevouts && this.fetchCpfp) {
       try {
         this.isLoadingCpfpInfo = true;
-        const cpfpInfo: CpfpInfo[] = await firstValueFrom(this.apiService.getCpfpLocalTx$([{
-          txid: transaction.txid,
-          weight: transaction.weight,
-          sigops: transaction.sigops,
-          fee: transaction.fee,
-          vin: transaction.vin,
-          vout: transaction.vout
-        }]));
+        const cpfpInfo: CpfpInfo[] = await firstValueFrom(
+          this.apiService.getCpfpLocalTx$([
+            {
+              txid: transaction.txid,
+              weight: transaction.weight,
+              sigops: transaction.sigops,
+              fee: transaction.fee,
+              vin: transaction.vin,
+              vout: transaction.vout,
+            },
+          ])
+        );
 
         if (cpfpInfo?.[0]?.ancestors?.length) {
           const { ancestors, effectiveFeePerVsize } = cpfpInfo[0];
@@ -208,13 +255,24 @@ export class TransactionRawComponent implements OnInit, OnDestroy {
     // Update URL fragment with hex data
     this.router.navigate([], {
       fragment: this.getCurrentFragments(),
-      replaceUrl: true
+      replaceUrl: true,
     });
 
-    this.transaction.flags = getTransactionFlags(this.transaction, this.cpfpInfo, null, null, this.stateService.network);
-    this.filters = this.transaction.flags ? toFilters(this.transaction.flags).filter(f => f.txPage) : [];
+    this.transaction.flags = getTransactionFlags(
+      this.transaction,
+      this.cpfpInfo,
+      null,
+      null,
+      this.stateService.network
+    );
+    this.filters = this.transaction.flags
+      ? toFilters(this.transaction.flags).filter((f) => f.txPage)
+      : [];
     if (this.transaction.sigops >= 0) {
-      this.adjustedVsize = Math.max(this.transaction.weight / 4, this.transaction.sigops * 5);
+      this.adjustedVsize = Math.max(
+        this.transaction.weight / 4,
+        this.transaction.sigops * 5
+      );
     }
 
     this.setupGraph();
@@ -225,42 +283,58 @@ export class TransactionRawComponent implements OnInit, OnDestroy {
     });
     this.setGraphSize();
 
-    this.mempoolBlocksSubscription = this.stateService.mempoolBlocks$.subscribe(() => {
-      if (this.transaction) {
-        this.stateService.markBlock$.next({
-          txid: this.transaction.txid,
-          txFeePerVSize: this.transaction.effectiveFeePerVsize || this.transaction.feePerVsize,
-        });
+    this.mempoolBlocksSubscription = this.stateService.mempoolBlocks$.subscribe(
+      () => {
+        if (this.transaction) {
+          this.stateService.markBlock$.next({
+            txid: this.transaction.txid,
+            txFeePerVSize:
+              this.transaction.effectiveFeePerVsize ||
+              this.transaction.feePerVsize,
+          });
+        }
       }
-    });
+    );
   }
 
   postTx(): void {
     this.isLoadingBroadcast = true;
     this.errorBroadcast = null;
 
-    this.broadcastSubscription = this.apiService.postTransaction$(this.rawHexTransaction).pipe(
-      tap((txid: string) => {
-        this.isLoadingBroadcast = false;
-        this.successBroadcast = true;
-        this.transaction.txid = txid;
-      }),
-      switchMap((txid: string) =>
-        timer(2000).pipe(
-          tap(() => this.router.navigate([this.relativeUrlPipe.transform('/tx/' + txid)])),
-        )
-      ),
-      catchError((error) => {
-        if (typeof error.error === 'string') {
-          const matchText = error.error.replace(/\\/g, '').match('"message":"(.*?)"');
-          this.errorBroadcast = 'Failed to broadcast transaction, reason: ' + (matchText && matchText[1] || error.error);
-        } else if (error.message) {
-          this.errorBroadcast = 'Failed to broadcast transaction, reason: ' + error.message;
-        }
-        this.isLoadingBroadcast = false;
-        return throwError(() => error);
-      })
-    ).subscribe();
+    this.broadcastSubscription = this.apiService
+      .postTransaction$(this.rawHexTransaction)
+      .pipe(
+        tap((txid: string) => {
+          this.isLoadingBroadcast = false;
+          this.successBroadcast = true;
+          this.transaction.txid = txid;
+        }),
+        switchMap((txid: string) =>
+          timer(2000).pipe(
+            tap(() =>
+              this.router.navigate([
+                this.relativeUrlPipe.transform('/tx/' + txid),
+              ])
+            )
+          )
+        ),
+        catchError((error) => {
+          if (typeof error.error === 'string') {
+            const matchText = error.error
+              .replace(/\\/g, '')
+              .match('"message":"(.*?)"');
+            this.errorBroadcast =
+              'Failed to broadcast transaction, reason: ' +
+              ((matchText && matchText[1]) || error.error);
+          } else if (error.message) {
+            this.errorBroadcast =
+              'Failed to broadcast transaction, reason: ' + error.message;
+          }
+          this.isLoadingBroadcast = false;
+          return throwError(() => error);
+        })
+      )
+      .subscribe();
   }
 
   resetState() {
@@ -294,7 +368,7 @@ export class TransactionRawComponent implements OnInit, OnDestroy {
     this.offlineMode = false;
     this.router.navigate([], {
       fragment: '',
-      replaceUrl: true
+      replaceUrl: true,
     });
   }
 
@@ -306,17 +380,29 @@ export class TransactionRawComponent implements OnInit, OnDestroy {
         if (this.graphContainer?.nativeElement?.clientWidth) {
           this.graphWidth = this.graphContainer.nativeElement.clientWidth;
         } else {
-          setTimeout(() => { this.setGraphSize(); }, 1);
+          setTimeout(() => {
+            this.setGraphSize();
+          }, 1);
         }
       }, 1);
     } else {
-      setTimeout(() => { this.setGraphSize(); }, 1);
+      setTimeout(() => {
+        this.setGraphSize();
+      }, 1);
     }
   }
 
   setupGraph() {
-    this.maxInOut = Math.min(this.inOutLimit, Math.max(this.transaction?.vin?.length || 1, this.transaction?.vout?.length + 1 || 1));
-    this.graphHeight = this.graphExpanded ? this.maxInOut * 15 : Math.min(360, this.maxInOut * 80);
+    this.maxInOut = Math.min(
+      this.inOutLimit,
+      Math.max(
+        this.transaction?.vin?.length || 1,
+        this.transaction?.vout?.length + 1 || 1
+      )
+    );
+    this.graphHeight = this.graphExpanded
+      ? this.maxInOut * 15
+      : Math.min(360, this.maxInOut * 80);
   }
 
   toggleGraph() {
@@ -354,7 +440,7 @@ export class TransactionRawComponent implements OnInit, OnDestroy {
     this.offlineMode = !e.target.checked;
     this.router.navigate([], {
       fragment: this.getCurrentFragments(),
-      replaceUrl: true
+      replaceUrl: true,
     });
   }
 
@@ -365,5 +451,4 @@ export class TransactionRawComponent implements OnInit, OnDestroy {
     this.broadcastSubscription?.unsubscribe();
     this.fragmentSubscription?.unsubscribe();
   }
-
 }
