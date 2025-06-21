@@ -30,6 +30,9 @@ PROXY_CONFIG.push(
       secure: false,
       changeOrigin: true,
       proxyTimeout: 30000,
+      pathRewrite: {
+        "^/api/": "/",
+      },
     },
     {
       context: ["/api/v1/services/**"],
