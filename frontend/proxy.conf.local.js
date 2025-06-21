@@ -34,7 +34,7 @@ PROXY_CONFIG.push(
     },
     {
       context: ["/api/v1/**"],
-      target: `http://localhost:3006`,
+      target: `http://localhost:8999`,
       secure: false,
       ws: true,
       changeOrigin: true,
