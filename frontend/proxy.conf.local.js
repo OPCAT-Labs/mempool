@@ -25,6 +25,13 @@ let PROXY_CONFIG = [];
 PROXY_CONFIG.push(
   ...[
     {
+      context: ["/api/address/**/utxo"],
+      target: `http://localhost:3006`,
+      secure: false,
+      changeOrigin: true,
+      proxyTimeout: 30000,
+    },
+    {
       context: ["/api/v1/services/**"],
       target: `http://localhost:9000`,
       secure: false,
