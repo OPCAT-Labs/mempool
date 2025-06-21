@@ -42,7 +42,7 @@ PROXY_CONFIG.push(
     },
     {
       context: ["/api/**"],
-      target: `http://localhost:3006`,
+      target: `http://localhost:8999`,
       secure: false,
       changeOrigin: true,
       proxyTimeout: 30000,
