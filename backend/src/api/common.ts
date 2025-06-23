@@ -1,18 +1,31 @@
 import * as bitcoinjs from 'bitcoinjs-lib';
 import { Request } from 'express';
-import { EffectiveFeeStats, MempoolBlockWithTransactions, TransactionExtended, MempoolTransactionExtended, TransactionStripped, WorkingEffectiveFeeStats, TransactionClassified, TransactionFlags } from '../mempool.interfaces';
+import {
+  EffectiveFeeStats,
+  MempoolBlockWithTransactions,
+  TransactionExtended,
+  MempoolTransactionExtended,
+  TransactionStripped,
+  WorkingEffectiveFeeStats,
+  TransactionClassified,
+  TransactionFlags,
+} from '../mempool.interfaces';
 import config from '../config';
 import { NodeSocket } from '../repositories/NodesSocketsRepository';
 import { isIP } from 'net';
 import transactionUtils from './transaction-utils';
 import { isPoint } from '../utils/secp256k1';
 import logger from '../logger';
-import { getVarIntLength, opcodes, parseMultisigScript } from '../utils/bitcoin-script';
+import {
+  getVarIntLength,
+  opcodes,
+  parseMultisigScript,
+} from '../utils/bitcoin-script';
 
 // Bitcoin Core default policy settings
 const MAX_STANDARD_TX_WEIGHT = 400_000;
 const MAX_BLOCK_SIGOPS_COST = 80_000;
-const MAX_STANDARD_TX_SIGOPS_COST = (MAX_BLOCK_SIGOPS_COST / 5);
+const MAX_STANDARD_TX_SIGOPS_COST = MAX_BLOCK_SIGOPS_COST / 5;
 const MIN_STANDARD_TX_NONWITNESS_SIZE = 65;
 const MAX_P2SH_SIGOPS = 15;
 const MAX_STANDARD_P2WSH_STACK_ITEMS = 100;
@@ -25,10 +38,13 @@ const MAX_OP_RETURN_RELAY = 83;
 const DEFAULT_PERMIT_BAREMULTISIG = true;
 
 export class Common {
-  static nativeAssetId = config.MEMPOOL.NETWORK === 'liquidtestnet' ?
-    '144c654344aa716d6f3abcc1ca90e5641e4e2a7f633bc09fe3baf64585819a49'
-  : '6f0279e9ed041c3d710a9f57d0c02928416460c4b722ae3457a11eec381c526d';
-  static _isLiquid = config.MEMPOOL.NETWORK === 'liquid' || config.MEMPOOL.NETWORK === 'liquidtestnet';
+  static nativeAssetId =
+    config.MEMPOOL.NETWORK === 'liquidtestnet'
+      ? '144c654344aa716d6f3abcc1ca90e5641e4e2a7f633bc09fe3baf64585819a49'
+      : '6f0279e9ed041c3d710a9f57d0c02928416460c4b722ae3457a11eec381c526d';
+  static _isLiquid =
+    config.MEMPOOL.NETWORK === 'liquid' ||
+    config.MEMPOOL.NETWORK === 'liquidtestnet';
 
   static isLiquid(): boolean {
     return this._isLiquid;
@@ -38,9 +54,9 @@ export class Common {
     let medianNr = 0;
     const numsLen = numbers.length;
     if (numsLen % 2 === 0) {
-        medianNr = (numbers[numsLen / 2 - 1] + numbers[numsLen / 2]) / 2;
+      medianNr = (numbers[numsLen / 2 - 1] + numbers[numsLen / 2]) / 2;
     } else {
-        medianNr = numbers[(numsLen - 1) / 2];
+      medianNr = numbers[(numsLen - 1) / 2];
     }
     return medianNr;
   }
@@ -56,7 +72,10 @@ export class Common {
     return numbers[index];
   }
 
-  static getFeesInRange(transactions: TransactionExtended[], rangeLength: number) {
+  static getFeesInRange(
+    transactions: TransactionExtended[],
+    rangeLength: number
+  ) {
     const filtered: TransactionExtended[] = [];
     let lastValidRate = Infinity;
     // filter out anomalous fee rates to ensure monotonic range
@@ -71,7 +90,10 @@ export class Common {
     let itemsToAdd = rangeLength - 2;
 
     while (itemsToAdd > 0) {
-      arr.push(filtered[Math.floor(filtered.length * chunk * itemsToAdd)].effectiveFeePerVsize);
+      arr.push(
+        filtered[Math.floor(filtered.length * chunk * itemsToAdd)]
+          .effectiveFeePerVsize
+      );
       itemsToAdd--;
     }
 
@@ -79,28 +101,53 @@ export class Common {
     return arr;
   }
 
-  static findRbfTransactions(added: MempoolTransactionExtended[], deleted: MempoolTransactionExtended[], forceScalable = false): { [txid: string]: { replaced: MempoolTransactionExtended[], replacedBy: TransactionExtended }} {
-    const matches: { [txid: string]: { replaced: MempoolTransactionExtended[], replacedBy: TransactionExtended }} = {};
+  static findRbfTransactions(
+    added: MempoolTransactionExtended[],
+    deleted: MempoolTransactionExtended[],
+    forceScalable = false
+  ): {
+    [txid: string]: {
+      replaced: MempoolTransactionExtended[];
+      replacedBy: TransactionExtended;
+    };
+  } {
+    const matches: {
+      [txid: string]: {
+        replaced: MempoolTransactionExtended[];
+        replacedBy: TransactionExtended;
+      };
+    } = {};
 
     // For small N, a naive nested loop is extremely fast, but it doesn't scale
     if (added.length < 1000 && deleted.length < 50 && !forceScalable) {
       added.forEach((addedTx) => {
         const foundMatches = deleted.filter((deletedTx) => {
           // The new tx must, absolutely speaking, pay at least as much fee as the replaced tx.
-          return addedTx.fee > deletedTx.fee
+          return (
+            addedTx.fee > deletedTx.fee &&
             // The new transaction must pay more fee per kB than the replaced tx.
-            && addedTx.adjustedFeePerVsize > deletedTx.adjustedFeePerVsize
+            addedTx.adjustedFeePerVsize > deletedTx.adjustedFeePerVsize &&
             // Spends one or more of the same inputs
-            && deletedTx.vin.some((deletedVin) =>
-              addedTx.vin.some((vin) => vin.txid === deletedVin.txid && vin.vout === deletedVin.vout));
-            });
+            deletedTx.vin.some((deletedVin) =>
+              addedTx.vin.some(
+                (vin) =>
+                  vin.txid === deletedVin.txid && vin.vout === deletedVin.vout
+              )
+            )
+          );
+        });
         if (foundMatches?.length) {
-          matches[addedTx.txid] = { replaced: [...new Set(foundMatches)], replacedBy: addedTx };
+          matches[addedTx.txid] = {
+            replaced: [...new Set(foundMatches)],
+            replacedBy: addedTx,
+          };
         }
       });
     } else {
       // for large N, build a lookup table of prevouts we can check in ~constant time
-      const deletedSpendMap: { [txid: string]: { [vout: number]: MempoolTransactionExtended } } = {};
+      const deletedSpendMap: {
+        [txid: string]: { [vout: number]: MempoolTransactionExtended };
+      } = {};
       for (const tx of deleted) {
         for (const vin of tx.vin) {
           if (!deletedSpendMap[vin.txid]) {
@@ -114,16 +161,21 @@ export class Common {
         const foundMatches = new Set<MempoolTransactionExtended>();
         for (const vin of addedTx.vin) {
           const deletedTx = deletedSpendMap[vin.txid]?.[vin.vout];
-          if (deletedTx && deletedTx.txid !== addedTx.txid
-              // The new tx must, absolutely speaking, pay at least as much fee as the replaced tx.
-              && addedTx.fee > deletedTx.fee
-              // The new transaction must pay more fee per kB than the replaced tx.
-              && addedTx.adjustedFeePerVsize > deletedTx.adjustedFeePerVsize
+          if (
+            deletedTx &&
+            deletedTx.txid !== addedTx.txid &&
+            // The new tx must, absolutely speaking, pay at least as much fee as the replaced tx.
+            addedTx.fee > deletedTx.fee &&
+            // The new transaction must pay more fee per kB than the replaced tx.
+            addedTx.adjustedFeePerVsize > deletedTx.adjustedFeePerVsize
           ) {
             foundMatches.add(deletedTx);
           }
           if (foundMatches.size) {
-            matches[addedTx.txid] = { replaced: [...foundMatches], replacedBy: addedTx };
+            matches[addedTx.txid] = {
+              replaced: [...foundMatches],
+              replacedBy: addedTx,
+            };
           }
         }
       }
@@ -132,8 +184,21 @@ export class Common {
     return matches;
   }
 
-  static findMinedRbfTransactions(minedTransactions: TransactionExtended[], spendMap: Map<string, MempoolTransactionExtended>): { [txid: string]: { replaced: MempoolTransactionExtended[], replacedBy: TransactionExtended }} {
-    const matches: { [txid: string]: { replaced: MempoolTransactionExtended[], replacedBy: TransactionExtended }} = {};
+  static findMinedRbfTransactions(
+    minedTransactions: TransactionExtended[],
+    spendMap: Map<string, MempoolTransactionExtended>
+  ): {
+    [txid: string]: {
+      replaced: MempoolTransactionExtended[];
+      replacedBy: TransactionExtended;
+    };
+  } {
+    const matches: {
+      [txid: string]: {
+        replaced: MempoolTransactionExtended[];
+        replacedBy: TransactionExtended;
+      };
+    } = {};
     for (const tx of minedTransactions) {
       const replaced: Set<MempoolTransactionExtended> = new Set();
       for (let i = 0; i < tx.vin.length; i++) {
@@ -163,7 +228,8 @@ export class Common {
     if (!witness?.length) {
       return flags;
     }
-    const hasAnnex = witness.length > 1 && witness[witness.length - 1].startsWith('50');
+    const hasAnnex =
+      witness.length > 1 && witness[witness.length - 1].startsWith('50');
     if (witness?.length === (hasAnnex ? 2 : 1)) {
       // keypath spend, signature is the only witness item
       if (witness[0].length === 130) {
@@ -187,10 +253,11 @@ export class Common {
 
   static isDERSig(w: string): boolean {
     // heuristic to detect probable DER signatures
-    return (w.length >= 18
-      && w.startsWith('30') // minimum DER signature length is 8 bytes + sighash flag (see https://mempool.space/testnet/tx/c6c232a36395fa338da458b86ff1327395a9afc28c5d2daa4273e410089fd433)
-      && ['01', '02', '03', '81', '82', '83'].includes(w.slice(-2)) // signature must end with a valid sighash flag
-      && (w.length === (2 * parseInt(w.slice(2, 4), 16)) + 6) // second byte encodes the combined length of the R and S components
+    return (
+      w.length >= 18 &&
+      w.startsWith('30') && // minimum DER signature length is 8 bytes + sighash flag (see https://mempool.space/testnet/tx/c6c232a36395fa338da458b86ff1327395a9afc28c5d2daa4273e410089fd433)
+      ['01', '02', '03', '81', '82', '83'].includes(w.slice(-2)) && // signature must end with a valid sighash flag
+      w.length === 2 * parseInt(w.slice(2, 4), 16) + 6 // second byte encodes the combined length of the R and S components
     );
   }
 
@@ -231,7 +298,7 @@ export class Common {
         return false;
       }
       // scriptsig-size
-      if ((vin.scriptsig.length / 2) > MAX_STANDARD_SCRIPTSIG_SIZE) {
+      if (vin.scriptsig.length / 2 > MAX_STANDARD_SCRIPTSIG_SIZE) {
         return true;
       }
       // scriptsig-not-pushonly
@@ -246,25 +313,33 @@ export class Common {
       if (vin.prevout?.scriptpubkey_type === 'p2sh') {
         // TODO: evaluate script (https://github.com/bitcoin/bitcoin/blob/1ac627c485a43e50a9a49baddce186ee3ad4daad/src/policy/policy.cpp#L177)
         // countScriptSigops returns the witness-scaled sigops, so divide by 4 before comparison with MAX_P2SH_SIGOPS
-        const sigops = (transactionUtils.countScriptSigops(vin.inner_redeemscript_asm) / 4);
+        const sigops =
+          transactionUtils.countScriptSigops(vin.inner_redeemscript_asm) / 4;
         if (sigops > MAX_P2SH_SIGOPS) {
           return true;
         }
-      } else if (['unknown', 'provably_unspendable', 'empty'].includes(vin.prevout?.scriptpubkey_type || '')) {
+      } else if (
+        ['unknown', 'provably_unspendable', 'empty'].includes(
+          vin.prevout?.scriptpubkey_type || ''
+        )
+      ) {
         return true;
       } else if (this.isNonStandardAnchor(tx, height)) {
         return true;
       }
       // bad-witness-nonstandard
       if (vin.prevout?.scriptpubkey_type === 'v1_p2tr' && vin.witness?.length) {
-        const hasAnnex = vin.witness.length > 1 && vin.witness[vin.witness.length - 1].startsWith('50');
+        const hasAnnex =
+          vin.witness.length > 1 &&
+          vin.witness[vin.witness.length - 1].startsWith('50');
         // annex is non-standard
         if (hasAnnex) {
           return true;
         }
         if (vin.witness.length > (hasAnnex ? 2 : 1)) {
           // script path spend
-          const controlBlock = vin.witness[vin.witness.length - (hasAnnex ? 2 : 1)];
+          const controlBlock =
+            vin.witness[vin.witness.length - (hasAnnex ? 2 : 1)];
           // control block is required
           if (!controlBlock.length) {
             return false;
@@ -275,7 +350,11 @@ export class Common {
             }
           }
           // remaining witness items (except for the script) must be within MAX_STANDARD_TAPSCRIPT_STACK_ITEM_SIZE limit
-          if (vin.witness.slice(0, vin.witness.length - (hasAnnex ? 3 : 2)).some(v => v.length > 160)) {
+          if (
+            vin.witness
+              .slice(0, vin.witness.length - (hasAnnex ? 3 : 2))
+              .some((v) => v.length > 160)
+          ) {
             return false;
           }
         }
@@ -287,13 +366,20 @@ export class Common {
     let opreturnCount = 0;
     for (const vout of tx.vout) {
       // scriptpubkey
-      if (['nonstandard', 'provably_unspendable', 'empty'].includes(vout.scriptpubkey_type)) {
+      if (
+        ['nonstandard', 'provably_unspendable', 'empty'].includes(
+          vout.scriptpubkey_type
+        )
+      ) {
         // (non-standard output type)
         return true;
       } else if (vout.scriptpubkey_type === 'unknown') {
         // undefined segwit version/length combinations are actually standard in outputs
         // https://github.com/bitcoin/bitcoin/blob/2c79abc7ad4850e9e3ba32a04c530155cda7f980/src/script/interpreter.cpp#L1950-L1951
-        if (vout.scriptpubkey.startsWith('00') || !this.isWitnessProgram(vout.scriptpubkey)) {
+        if (
+          vout.scriptpubkey.startsWith('00') ||
+          !this.isWitnessProgram(vout.scriptpubkey)
+        ) {
           return true;
         }
       } else if (vout.scriptpubkey_type === 'multisig') {
@@ -302,13 +388,19 @@ export class Common {
           return true;
         }
         const mOfN = parseMultisigScript(vout.scriptpubkey_asm);
-        if (!mOfN || mOfN.n < 1 || mOfN.n > 3 || mOfN.m < 1 || mOfN.m > mOfN.n) {
+        if (
+          !mOfN ||
+          mOfN.n < 1 ||
+          mOfN.n > 3 ||
+          mOfN.m < 1 ||
+          mOfN.m > mOfN.n
+        ) {
           // (non-standard bare multisig threshold)
           return true;
         }
       } else if (vout.scriptpubkey_type === 'op_return') {
         opreturnCount++;
-        if ((vout.scriptpubkey.length / 2) > MAX_OP_RETURN_RELAY) {
+        if (vout.scriptpubkey.length / 2 > MAX_OP_RETURN_RELAY) {
           // over default datacarrier limit
           return true;
         }
@@ -316,7 +408,7 @@ export class Common {
       // dust
       // (we could probably hardcode this for the different output types...)
       if (vout.scriptpubkey_type !== 'op_return') {
-        let dustSize = (vout.scriptpubkey.length / 2);
+        let dustSize = vout.scriptpubkey.length / 2;
         // add varint length overhead
         dustSize += getVarIntLength(dustSize);
         // add value size
@@ -326,7 +418,7 @@ export class Common {
         } else {
           dustSize += 148;
         }
-        if (vout.value < (dustSize * DUST_RELAY_TX_FEE)) {
+        if (vout.value < dustSize * DUST_RELAY_TX_FEE) {
           // under minimum output size
           return true;
         }
@@ -346,16 +438,18 @@ export class Common {
   // A witness program is any valid scriptpubkey that consists of a 1-byte push opcode
   // followed by a data push between 2 and 40 bytes.
   // https://github.com/bitcoin/bitcoin/blob/2c79abc7ad4850e9e3ba32a04c530155cda7f980/src/script/script.cpp#L224-L240
-  static isWitnessProgram(scriptpubkey: string): false | { version: number, program: string } {
+  static isWitnessProgram(
+    scriptpubkey: string
+  ): false | { version: number; program: string } {
     if (scriptpubkey.length < 8 || scriptpubkey.length > 84) {
       return false;
     }
-    const version = parseInt(scriptpubkey.slice(0,2), 16);
-    if (version !== 0 && version < 0x51 || version > 0x60) {
-        return false;
+    const version = parseInt(scriptpubkey.slice(0, 2), 16);
+    if ((version !== 0 && version < 0x51) || version > 0x60) {
+      return false;
     }
-    const push = parseInt(scriptpubkey.slice(2,4), 16);
-    if (push + 2 === (scriptpubkey.length / 2)) {
+    const push = parseInt(scriptpubkey.slice(2, 4), 16);
+    if (push + 2 === scriptpubkey.length / 2) {
       return {
         version: version ? version - 0x50 : 0,
         program: scriptpubkey.slice(4),
@@ -367,17 +461,20 @@ export class Common {
   // Individual versioned standardness rules
 
   static V3_STANDARDNESS_ACTIVATION_HEIGHT = {
-    'testnet4': 42_000,
-    'testnet': 2_900_000,
-    'signet': 211_000,
+    testnet4: 42_000,
+    testnet: 2_900_000,
+    signet: 211_000,
     '': 863_500,
   };
-  static isNonStandardVersion(tx: TransactionExtended, height?: number): boolean {
+  static isNonStandardVersion(
+    tx: TransactionExtended,
+    height?: number
+  ): boolean {
     let TX_MAX_STANDARD_VERSION = 3;
     if (
-      height != null
-      && this.V3_STANDARDNESS_ACTIVATION_HEIGHT[config.MEMPOOL.NETWORK]
-      && height <= this.V3_STANDARDNESS_ACTIVATION_HEIGHT[config.MEMPOOL.NETWORK]
+      height != null &&
+      this.V3_STANDARDNESS_ACTIVATION_HEIGHT[config.MEMPOOL.NETWORK] &&
+      height <= this.V3_STANDARDNESS_ACTIVATION_HEIGHT[config.MEMPOOL.NETWORK]
     ) {
       // V3 transactions were non-standard to spend before v28.x (scheduled for 2024/09/30 https://github.com/bitcoin/bitcoin/issues/29891)
       TX_MAX_STANDARD_VERSION = 2;
@@ -390,16 +487,20 @@ export class Common {
   }
 
   static ANCHOR_STANDARDNESS_ACTIVATION_HEIGHT = {
-    'testnet4': 42_000,
-    'testnet': 2_900_000,
-    'signet': 211_000,
+    testnet4: 42_000,
+    testnet: 2_900_000,
+    signet: 211_000,
     '': 863_500,
   };
-  static isNonStandardAnchor(tx: TransactionExtended, height?: number): boolean {
+  static isNonStandardAnchor(
+    tx: TransactionExtended,
+    height?: number
+  ): boolean {
     if (
-      height != null
-      && this.ANCHOR_STANDARDNESS_ACTIVATION_HEIGHT[config.MEMPOOL.NETWORK]
-      && height <= this.ANCHOR_STANDARDNESS_ACTIVATION_HEIGHT[config.MEMPOOL.NETWORK]
+      height != null &&
+      this.ANCHOR_STANDARDNESS_ACTIVATION_HEIGHT[config.MEMPOOL.NETWORK] &&
+      height <=
+        this.ANCHOR_STANDARDNESS_ACTIVATION_HEIGHT[config.MEMPOOL.NETWORK]
     ) {
       // anchor outputs were non-standard to spend before v28.x (scheduled for 2024/09/30 https://github.com/bitcoin/bitcoin/issues/29891)
       return true;
@@ -417,7 +518,7 @@ export class Common {
         weight -= getVarIntLength(vin.witness.length);
         for (const witness of vin.witness) {
           // witness item size + content
-          weight -= getVarIntLength(witness.length / 2) + (witness.length / 2);
+          weight -= getVarIntLength(witness.length / 2) + witness.length / 2;
         }
       }
     }
@@ -452,14 +553,27 @@ export class Common {
   }
 
   static setSighashFlags(flags: bigint, signature: string): bigint {
-    switch(signature.slice(-2)) {
-      case '01': return flags | TransactionFlags.sighash_all;
-      case '02': return flags | TransactionFlags.sighash_none;
-      case '03': return flags | TransactionFlags.sighash_single;
-      case '81': return flags | TransactionFlags.sighash_all | TransactionFlags.sighash_acp;
-      case '82': return flags | TransactionFlags.sighash_none | TransactionFlags.sighash_acp;
-      case '83': return flags | TransactionFlags.sighash_single | TransactionFlags.sighash_acp;
-      default: return flags | TransactionFlags.sighash_default; // taproot only
+    switch (signature.slice(-2)) {
+      case '01':
+        return flags | TransactionFlags.sighash_all;
+      case '02':
+        return flags | TransactionFlags.sighash_none;
+      case '03':
+        return flags | TransactionFlags.sighash_single;
+      case '81':
+        return (
+          flags | TransactionFlags.sighash_all | TransactionFlags.sighash_acp
+        );
+      case '82':
+        return (
+          flags | TransactionFlags.sighash_none | TransactionFlags.sighash_acp
+        );
+      case '83':
+        return (
+          flags | TransactionFlags.sighash_single | TransactionFlags.sighash_acp
+        );
+      default:
+        return flags | TransactionFlags.sighash_default; // taproot only
     }
   }
 
@@ -478,7 +592,11 @@ export class Common {
     // script spends have more than one witness item, not counting the annex (if present)
     if (vin.witness.length > (hasAnnex ? 2 : 1)) {
       // the script itself is the second-to-last witness item, not counting the annex
-      const asm = vin.inner_witnessscript_asm || transactionUtils.convertScriptSigAsm(vin.witness[vin.witness.length - (hasAnnex ? 3 : 2)]);
+      const asm =
+        vin.inner_witnessscript_asm ||
+        transactionUtils.convertScriptSigAsm(
+          vin.witness[vin.witness.length - (hasAnnex ? 3 : 2)]
+        );
       // inscriptions smuggle data within an 'OP_0 OP_IF ... OP_ENDIF' envelope
       if (asm?.includes('OP_0 OP_IF')) {
         flags |= TransactionFlags.inscription;
@@ -517,8 +635,8 @@ export class Common {
     } else if (tx.version === 3) {
       flags |= TransactionFlags.v3;
     }
-    const reusedInputAddresses: { [address: string ]: number } = {};
-    const reusedOutputAddresses: { [address: string ]: number } = {};
+    const reusedInputAddresses: { [address: string]: number } = {};
+    const reusedOutputAddresses: { [address: string]: number } = {};
     const inValues = {};
     const outValues = {};
     let rbf = false;
@@ -528,22 +646,38 @@ export class Common {
       }
       if (vin.prevout?.scriptpubkey_type) {
         switch (vin.prevout?.scriptpubkey_type) {
-          case 'p2pk': flags |= TransactionFlags.p2pk; break;
-          case 'multisig': flags |= TransactionFlags.p2ms; break;
-          case 'p2pkh': flags |= TransactionFlags.p2pkh; break;
-          case 'p2sh': flags |= TransactionFlags.p2sh; break;
-          case 'v0_p2wpkh': flags |= TransactionFlags.p2wpkh; break;
-          case 'v0_p2wsh': flags |= TransactionFlags.p2wsh; break;
-          case 'v1_p2tr': {
-            flags |= TransactionFlags.p2tr;
-            if (vin.witness?.length) {
-              flags = Common.isInscription(vin, flags);
-              const hasAnnex = vin.witness.length > 1 && vin.witness[vin.witness.length - 1].startsWith('50');
-              if (hasAnnex) {
-                flags |= TransactionFlags.annex;
+          case 'p2pk':
+            flags |= TransactionFlags.p2pk;
+            break;
+          case 'multisig':
+            flags |= TransactionFlags.p2ms;
+            break;
+          case 'p2pkh':
+            flags |= TransactionFlags.p2pkh;
+            break;
+          case 'p2sh':
+            flags |= TransactionFlags.p2sh;
+            break;
+          case 'v0_p2wpkh':
+            flags |= TransactionFlags.p2wpkh;
+            break;
+          case 'v0_p2wsh':
+            flags |= TransactionFlags.p2wsh;
+            break;
+          case 'v1_p2tr':
+            {
+              flags |= TransactionFlags.p2tr;
+              if (vin.witness?.length) {
+                flags = Common.isInscription(vin, flags);
+                const hasAnnex =
+                  vin.witness.length > 1 &&
+                  vin.witness[vin.witness.length - 1].startsWith('50');
+                if (hasAnnex) {
+                  flags |= TransactionFlags.annex;
+                }
               }
             }
-          } break;
+            break;
         }
       } else {
         // no prevouts, optimistically check witness-bearing inputs
@@ -562,13 +696,19 @@ export class Common {
       } else if (vin.witness) {
         flags |= this.setSegwitSighashFlags(flags, vin.witness);
       } else if (vin.scriptsig?.length) {
-        flags |= this.setLegacySighashFlags(flags, vin.scriptsig_asm || transactionUtils.convertScriptSigAsm(vin.scriptsig));
+        flags |= this.setLegacySighashFlags(
+          flags,
+          vin.scriptsig_asm ||
+            transactionUtils.convertScriptSigAsm(vin.scriptsig)
+        );
       }
 
       if (vin.prevout?.scriptpubkey_address) {
-        reusedInputAddresses[vin.prevout?.scriptpubkey_address] = (reusedInputAddresses[vin.prevout?.scriptpubkey_address] || 0) + 1;
+        reusedInputAddresses[vin.prevout?.scriptpubkey_address] =
+          (reusedInputAddresses[vin.prevout?.scriptpubkey_address] || 0) + 1;
       }
-      inValues[vin.prevout?.value || Math.random()] = (inValues[vin.prevout?.value || Math.random()] || 0) + 1;
+      inValues[vin.prevout?.value || Math.random()] =
+        (inValues[vin.prevout?.value || Math.random()] || 0) + 1;
     }
     if (rbf) {
       flags |= TransactionFlags.rbf;
@@ -580,30 +720,51 @@ export class Common {
     let olgaSize = 0;
     for (const vout of tx.vout) {
       switch (vout.scriptpubkey_type) {
-        case 'p2pk': {
-          flags |= TransactionFlags.p2pk;
-          // detect fake pubkey (i.e. not a valid DER point on the secp256k1 curve)
-          hasFakePubkey = hasFakePubkey || !isPoint(vout.scriptpubkey?.slice(2, -2));
-        } break;
-        case 'multisig': {
-          flags |= TransactionFlags.p2ms;
-          // detect fake pubkeys (i.e. not valid DER points on the secp256k1 curve)
-          const asm = vout.scriptpubkey_asm || transactionUtils.convertScriptSigAsm(vout.scriptpubkey);
-          for (const key of (asm?.split(' ') || [])) {
-            if (!hasFakePubkey && !key.startsWith('OP_')) {
-              hasFakePubkey = hasFakePubkey || this.isBurnKey(key) || !isPoint(key);
+        case 'p2pk':
+          {
+            flags |= TransactionFlags.p2pk;
+            // detect fake pubkey (i.e. not a valid DER point on the secp256k1 curve)
+            hasFakePubkey =
+              hasFakePubkey || !isPoint(vout.scriptpubkey?.slice(2, -2));
+          }
+          break;
+        case 'multisig':
+          {
+            flags |= TransactionFlags.p2ms;
+            // detect fake pubkeys (i.e. not valid DER points on the secp256k1 curve)
+            const asm =
+              vout.scriptpubkey_asm ||
+              transactionUtils.convertScriptSigAsm(vout.scriptpubkey);
+            for (const key of asm?.split(' ') || []) {
+              if (!hasFakePubkey && !key.startsWith('OP_')) {
+                hasFakePubkey =
+                  hasFakePubkey || this.isBurnKey(key) || !isPoint(key);
+              }
             }
           }
-        } break;
-        case 'p2pkh': flags |= TransactionFlags.p2pkh; break;
-        case 'p2sh': flags |= TransactionFlags.p2sh; break;
-        case 'v0_p2wpkh': flags |= TransactionFlags.p2wpkh; break;
-        case 'v0_p2wsh': flags |= TransactionFlags.p2wsh; break;
-        case 'v1_p2tr': flags |= TransactionFlags.p2tr; break;
-        case 'op_return': flags |= TransactionFlags.op_return; break;
+          break;
+        case 'p2pkh':
+          flags |= TransactionFlags.p2pkh;
+          break;
+        case 'p2sh':
+          flags |= TransactionFlags.p2sh;
+          break;
+        case 'v0_p2wpkh':
+          flags |= TransactionFlags.p2wpkh;
+          break;
+        case 'v0_p2wsh':
+          flags |= TransactionFlags.p2wsh;
+          break;
+        case 'v1_p2tr':
+          flags |= TransactionFlags.p2tr;
+          break;
+        case 'op_return':
+          flags |= TransactionFlags.op_return;
+          break;
       }
       if (vout.scriptpubkey_address) {
-        reusedOutputAddresses[vout.scriptpubkey_address] = (reusedOutputAddresses[vout.scriptpubkey_address] || 0) + 1;
+        reusedOutputAddresses[vout.scriptpubkey_address] =
+          (reusedOutputAddresses[vout.scriptpubkey_address] || 0) + 1;
       }
       if (vout.scriptpubkey_type === 'v0_p2wsh') {
         if (!P2WSHCount) {
@@ -611,7 +772,7 @@ export class Common {
         }
         P2WSHCount++;
         if (P2WSHCount === Math.ceil((olgaSize + 2) / 32)) {
-          const nullBytes = (P2WSHCount * 32) - olgaSize - 2;
+          const nullBytes = P2WSHCount * 32 - olgaSize - 2;
           if (vout.scriptpubkey.endsWith(''.padEnd(nullBytes * 2, '0'))) {
             flags |= TransactionFlags.fake_scripthash;
           }
@@ -619,7 +780,8 @@ export class Common {
       } else {
         P2WSHCount = 0;
       }
-      outValues[vout.value || Math.random()] = (outValues[vout.value || Math.random()] || 0) + 1;
+      outValues[vout.value || Math.random()] =
+        (outValues[vout.value || Math.random()] || 0) + 1;
     }
     if (hasFakePubkey) {
       flags |= TransactionFlags.fake_pubkey;
@@ -627,8 +789,22 @@ export class Common {
 
     // fast but bad heuristic to detect possible coinjoins
     // (at least 5 inputs and 5 outputs, less than half of which are unique amounts, with no address reuse)
-    const addressReuse = Object.keys(reusedOutputAddresses).reduce((acc, key) => Math.max(acc, (reusedInputAddresses[key] || 0) + (reusedOutputAddresses[key] || 0)), 0) > 1;
-    if (!addressReuse && tx.vin.length >= 5 && tx.vout.length >= 5 && (Object.keys(inValues).length + Object.keys(outValues).length) <= (tx.vin.length + tx.vout.length) / 2 ) {
+    const addressReuse =
+      Object.keys(reusedOutputAddresses).reduce(
+        (acc, key) =>
+          Math.max(
+            acc,
+            (reusedInputAddresses[key] || 0) + (reusedOutputAddresses[key] || 0)
+          ),
+        0
+      ) > 1;
+    if (
+      !addressReuse &&
+      tx.vin.length >= 5 &&
+      tx.vout.length >= 5 &&
+      Object.keys(inValues).length + Object.keys(outValues).length <=
+        (tx.vin.length + tx.vout.length) / 2
+    ) {
       flags |= TransactionFlags.coinjoin;
     }
     // more than 5:1 input:output ratio
@@ -647,12 +823,18 @@ export class Common {
     return Number(flags);
   }
 
-  static classifyTransaction(tx: TransactionExtended, height?: number): TransactionClassified {
+  static classifyTransaction(
+    tx: TransactionExtended,
+    height?: number
+  ): TransactionClassified {
     let flags = 0;
     try {
       flags = Common.getTransactionFlags(tx, height);
     } catch (e) {
-      logger.warn('Failed to add classification flags to transaction: ' + (e instanceof Error ? e.message : e));
+      logger.warn(
+        'Failed to add classification flags to transaction: ' +
+          (e instanceof Error ? e.message : e)
+      );
     }
     tx.flags = flags;
     return {
@@ -661,8 +843,11 @@ export class Common {
     };
   }
 
-  static classifyTransactions(txs: TransactionExtended[], height?: number): TransactionClassified[] {
-    return txs.map(tx => Common.classifyTransaction(tx, height));
+  static classifyTransactions(
+    txs: TransactionExtended[],
+    height?: number
+  ): TransactionClassified[] {
+    return txs.map((tx) => Common.classifyTransaction(tx, height));
   }
 
   static stripTransaction(tx: TransactionExtended): TransactionStripped {
@@ -670,7 +855,10 @@ export class Common {
       txid: tx.txid,
       fee: tx.fee || 0,
       vsize: tx.weight / 4,
-      value: tx.vout.reduce((acc, vout) => acc + (vout.value ? vout.value : 0), 0),
+      value: tx.vout.reduce(
+        (acc, vout) => acc + (vout.value ? vout.value : 0),
+        0
+      ),
       acc: tx.acceleration || undefined,
       rate: tx.effectiveFeePerVsize,
       time: tx.firstSeen || undefined,
@@ -683,21 +871,24 @@ export class Common {
 
   static sleep$(ms: number): Promise<void> {
     return new Promise((resolve) => {
-       setTimeout(() => {
-         resolve();
-       }, ms);
+      setTimeout(() => {
+        resolve();
+      }, ms);
     });
   }
 
   static shuffleArray(array: any[]) {
     for (let i = array.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [array[i], array[j]] = [array[j], array[i]];
+      const j = Math.floor(Math.random() * (i + 1));
+      [array[i], array[j]] = [array[j], array[i]];
     }
   }
 
   // calculates the ratio of matched transactions to projected transactions by weight
-  static getSimilarity(projectedBlock: MempoolBlockWithTransactions, transactions: TransactionExtended[]): number {
+  static getSimilarity(
+    projectedBlock: MempoolBlockWithTransactions,
+    transactions: TransactionExtended[]
+  ): number {
     let matchedWeight = 0;
     let projectedWeight = 0;
     const inBlock = {};
@@ -722,17 +913,28 @@ export class Common {
 
   static getSqlInterval(interval: string | null): string | null {
     switch (interval) {
-      case '24h': return '1 DAY';
-      case '3d': return '3 DAY';
-      case '1w': return '1 WEEK';
-      case '1m': return '1 MONTH';
-      case '3m': return '3 MONTH';
-      case '6m': return '6 MONTH';
-      case '1y': return '1 YEAR';
-      case '2y': return '2 YEAR';
-      case '3y': return '3 YEAR';
-      case '4y': return '4 YEAR';
-      default: return null;
+      case '24h':
+        return '1 DAY';
+      case '3d':
+        return '3 DAY';
+      case '1w':
+        return '1 WEEK';
+      case '1m':
+        return '1 MONTH';
+      case '3m':
+        return '3 MONTH';
+      case '6m':
+        return '6 MONTH';
+      case '1y':
+        return '1 YEAR';
+      case '2y':
+        return '2 YEAR';
+      case '3y':
+        return '3 YEAR';
+      case '4y':
+        return '4 YEAR';
+      default:
+        return null;
     }
   }
 
@@ -752,10 +954,7 @@ export class Common {
   }
 
   static auditIndexingEnabled(): boolean {
-    return (
-      Common.indexingEnabled() &&
-      config.MEMPOOL.AUDIT === true
-    );
+    return Common.indexingEnabled() && config.MEMPOOL.AUDIT === true;
   }
 
   static gogglesIndexingEnabled(): boolean {
@@ -766,10 +965,7 @@ export class Common {
   }
 
   static cpfpIndexingEnabled(): boolean {
-    return (
-      Common.indexingEnabled() &&
-      config.MEMPOOL.CPFP_INDEXING === true
-    );
+    return Common.indexingEnabled() && config.MEMPOOL.CPFP_INDEXING === true;
   }
 
   static setDateMidnight(date: Date): void {
@@ -780,13 +976,15 @@ export class Common {
   }
 
   static channelShortIdToIntegerId(channelId: string): string {
-    if (channelId.indexOf('x') === -1) { // Already an integer id
+    if (channelId.indexOf('x') === -1) {
+      // Already an integer id
       return channelId;
     }
-    if (channelId.indexOf('/') !== -1) { // Topology import
+    if (channelId.indexOf('/') !== -1) {
+      // Topology import
       channelId = channelId.slice(0, -2);
     }
-    const s = channelId.split('x').map(part => BigInt(part));
+    const s = channelId.split('x').map((part) => BigInt(part));
     return ((s[0] << 40n) | (s[1] << 16n) | s[2]).toString();
   }
 
@@ -795,8 +993,9 @@ export class Common {
     if (id.indexOf('/') !== -1) {
       id = id.slice(0, -2);
     }
-    
-    if (id.indexOf('x') !== -1) { // Already a short id
+
+    if (id.indexOf('x') !== -1) {
+      // Already a short id
       return id;
     }
 
@@ -804,7 +1003,7 @@ export class Common {
     return [
       n >> 40n, // nth block
       (n >> 16n) & 0xffffffn, // nth tx of the block
-      n & 0xffffn // nth output of the tx
+      n & 0xffffn, // nth output of the tx
     ].join('x');
   }
 
@@ -816,7 +1015,10 @@ export class Common {
     return d.toISOString().split('T')[0] + ' ' + d.toTimeString().split(' ')[0];
   }
 
-  static findSocketNetwork(addr: string): {network: string | null, url: string} {
+  static findSocketNetwork(addr: string): {
+    network: string | null;
+    url: string;
+  } {
     let network: string | null = null;
     let url: string = addr;
 
@@ -839,7 +1041,10 @@ export class Common {
       }
     } else if (addr.indexOf('i2p') !== -1) {
       network = 'i2p';
-    } else if (addr.indexOf('ipv4') !== -1 || (config.LIGHTNING.BACKEND === 'lnd' && isIP(url.split(':')[0]) === 4)) {
+    } else if (
+      addr.indexOf('ipv4') !== -1 ||
+      (config.LIGHTNING.BACKEND === 'lnd' && isIP(url.split(':')[0]) === 4)
+    ) {
       const ipv = isIP(url.split(':')[0]);
       if (ipv === 4) {
         network = 'ipv4';
@@ -849,7 +1054,10 @@ export class Common {
           url: addr,
         };
       }
-    } else if (addr.indexOf('ipv6') !== -1 || (config.LIGHTNING.BACKEND === 'lnd' && url.indexOf(']:'))) {
+    } else if (
+      addr.indexOf('ipv6') !== -1 ||
+      (config.LIGHTNING.BACKEND === 'lnd' && url.indexOf(']:'))
+    ) {
       url = url.split('[')[1].split(']')[0];
       const ipv = isIP(url);
       if (ipv === 6) {
@@ -875,14 +1083,17 @@ export class Common {
     };
   }
 
-  static formatSocket(publicKey: string, socket: {network: string, addr: string}): NodeSocket {
+  static formatSocket(
+    publicKey: string,
+    socket: { network: string; addr: string }
+  ): NodeSocket {
     if (config.LIGHTNING.BACKEND === 'cln') {
       return {
         publicKey: publicKey,
         network: socket.network,
         addr: socket.addr,
       };
-    } else /* if (config.LIGHTNING.BACKEND === 'lnd') */ {
+    } /* if (config.LIGHTNING.BACKEND === 'lnd') */ else {
       const formatted = this.findSocketNetwork(socket.addr);
       return {
         publicKey: publicKey,
@@ -892,8 +1103,24 @@ export class Common {
     }
   }
 
-  static calcEffectiveFeeStatistics(transactions: { weight: number, fee: number, effectiveFeePerVsize?: number, txid: string, acceleration?: boolean }[]): EffectiveFeeStats {
-    const sortedTxs = transactions.map(tx => { return { txid: tx.txid, weight: tx.weight, rate: tx.effectiveFeePerVsize || ((tx.fee || 0) / (tx.weight / 4)) }; }).sort((a, b) => a.rate - b.rate);
+  static calcEffectiveFeeStatistics(
+    transactions: {
+      weight: number;
+      fee: number;
+      effectiveFeePerVsize?: number;
+      txid: string;
+      acceleration?: boolean;
+    }[]
+  ): EffectiveFeeStats {
+    const sortedTxs = transactions
+      .map((tx) => {
+        return {
+          txid: tx.txid,
+          weight: tx.weight,
+          rate: tx.effectiveFeePerVsize || (tx.fee || 0) / (tx.weight / 4),
+        };
+      })
+      .sort((a, b) => a.rate - b.rate);
 
     let weightCount = 0;
     let medianFee = 0;
@@ -901,19 +1128,23 @@ export class Common {
 
     // calculate the "medianFee" as the average fee rate of the middle 0.25% weight units of transactions
     const halfWidth = config.MEMPOOL.BLOCK_WEIGHT_UNITS / 800;
-    const leftBound = Math.floor((config.MEMPOOL.BLOCK_WEIGHT_UNITS / 2) - halfWidth);
-    const rightBound = Math.ceil((config.MEMPOOL.BLOCK_WEIGHT_UNITS / 2) + halfWidth);
+    const leftBound = Math.floor(
+      config.MEMPOOL.BLOCK_WEIGHT_UNITS / 2 - halfWidth
+    );
+    const rightBound = Math.ceil(
+      config.MEMPOOL.BLOCK_WEIGHT_UNITS / 2 + halfWidth
+    );
     for (let i = 0; i < sortedTxs.length && weightCount < rightBound; i++) {
       const left = weightCount;
       const right = weightCount + sortedTxs[i].weight;
       if (right > leftBound) {
         const weight = Math.min(right, rightBound) - Math.max(left, leftBound);
-        medianFee += (sortedTxs[i].rate * (weight / 4) );
+        medianFee += sortedTxs[i].rate * (weight / 4);
         medianWeight += weight;
       }
       weightCount += sortedTxs[i].weight;
     }
-    const medianFeeRate = medianWeight ? (medianFee / (medianWeight / 4)) : 0;
+    const medianFeeRate = medianWeight ? medianFee / (medianWeight / 4) : 0;
 
     // minimum effective fee heuristic:
     // lowest of
@@ -921,7 +1152,12 @@ export class Common {
     // b) the minimum effective fee rate in the last 2% of transactions (in block order)
     const minFee = Math.min(
       Common.getNthPercentile(1, sortedTxs).rate,
-      transactions.slice(-transactions.length / 50).reduce((min, tx) => { return Math.min(min, tx.effectiveFeePerVsize || ((tx.fee || 0) / (tx.weight / 4))); }, Infinity)
+      transactions.slice(-transactions.length / 50).reduce((min, tx) => {
+        return Math.min(
+          min,
+          tx.effectiveFeePerVsize || (tx.fee || 0) / (tx.weight / 4)
+        );
+      }, Infinity)
     );
 
     // maximum effective fee heuristic:
@@ -930,34 +1166,46 @@ export class Common {
     // b) the maximum effective fee rate in the first 2% of transactions (in block order)
     const maxFee = Math.max(
       Common.getNthPercentile(99, sortedTxs).rate,
-      transactions.slice(0, transactions.length / 50).reduce((max, tx) => { return Math.max(max, tx.effectiveFeePerVsize || ((tx.fee || 0) / (tx.weight / 4))); }, 0)
+      transactions.slice(0, transactions.length / 50).reduce((max, tx) => {
+        return Math.max(
+          max,
+          tx.effectiveFeePerVsize || (tx.fee || 0) / (tx.weight / 4)
+        );
+      }, 0)
     );
 
     return {
       medianFee: medianFeeRate,
       feeRange: [
         minFee,
-        [10,25,50,75,90].map(n => Common.getNthPercentile(n, sortedTxs).rate),
+        [10, 25, 50, 75, 90].map(
+          (n) => Common.getNthPercentile(n, sortedTxs).rate
+        ),
         maxFee,
       ].flat(),
     };
   }
 
   static getNthPercentile(n: number, sortedDistribution: any[]): any {
-    return sortedDistribution[Math.floor((sortedDistribution.length - 1) * (n / 100))];
+    return sortedDistribution[
+      Math.floor((sortedDistribution.length - 1) * (n / 100))
+    ];
   }
 
   static getTransactionFromRequest(req: Request, form: boolean): string {
-    let rawTx: any = typeof req.body === 'object' && form
-      ? Object.values(req.body)[0] as any
-      : req.body;
+    let rawTx: any =
+      typeof req.body === 'object' && form
+        ? (Object.values(req.body)[0] as any)
+        : req.body;
     if (typeof rawTx !== 'string') {
       throw Object.assign(new Error('Non-string request body'), { code: -1 });
     }
 
     // Support both upper and lower case hex
     // Support both txHash= Form and direct API POST
-    const reg = form ? /^txHash=((?:[a-fA-F0-9]{2})+)$/ : /^((?:[a-fA-F0-9]{2})+)$/;
+    const reg = form
+      ? /^txHash=((?:[a-fA-F0-9]{2})+)$/
+      : /^((?:[a-fA-F0-9]{2})+)$/;
     const matches = reg.exec(rawTx);
     if (!matches || !matches[1]) {
       throw Object.assign(new Error('Non-hex request body'), { code: -2 });
@@ -966,21 +1214,34 @@ export class Common {
     // Guaranteed to be a hex string of multiple of 2
     // Guaranteed to be lower case
     // Guaranteed to pass validation (see function below)
-    return this.validateTransactionHex(matches[1].toLowerCase());
+    return matches[1].toLowerCase();
   }
 
-  static getTransactionsFromRequest(req: Request, limit: number = 25): string[] {
-    if (!Array.isArray(req.body) || req.body.some(hex => typeof hex !== 'string')) {
-      throw Object.assign(new Error('Invalid request body (should be an array of hexadecimal strings)'), { code: -1 });
+  static getTransactionsFromRequest(
+    req: Request,
+    limit: number = 25
+  ): string[] {
+    if (
+      !Array.isArray(req.body) ||
+      req.body.some((hex) => typeof hex !== 'string')
+    ) {
+      throw Object.assign(
+        new Error(
+          'Invalid request body (should be an array of hexadecimal strings)'
+        ),
+        { code: -1 }
+      );
     }
 
     if (limit && req.body.length > limit) {
-      throw Object.assign(new Error('Exceeded maximum of 25 transactions'), { code: -1 });
+      throw Object.assign(new Error('Exceeded maximum of 25 transactions'), {
+        code: -1,
+      });
     }
 
     const txs = req.body;
 
-    return txs.map(rawTx => {
+    return txs.map((rawTx) => {
       // Support both upper and lower case hex
       // Support both txHash= Form and direct API POST
       const reg = /^((?:[a-fA-F0-9]{2})+)$/;
@@ -1005,28 +1266,39 @@ export class Common {
     let tx: bitcoinjs.Transaction;
     try {
       tx = bitcoinjs.Transaction.fromHex(txhex);
-    } catch(e) {
-      throw Object.assign(new Error('Invalid transaction (could not parse)'), { code: -4 });
+    } catch (e) {
+      throw Object.assign(new Error('Invalid transaction (could not parse)'), {
+        code: -4,
+      });
     }
 
     // Check 2: Simple size check
     if (tx.weight() > config.MEMPOOL.MAX_PUSH_TX_SIZE_WEIGHT) {
-      throw Object.assign(new Error(`Transaction too large (max ${config.MEMPOOL.MAX_PUSH_TX_SIZE_WEIGHT} weight units)`), { code: -3 });
+      throw Object.assign(
+        new Error(
+          `Transaction too large (max ${config.MEMPOOL.MAX_PUSH_TX_SIZE_WEIGHT} weight units)`
+        ),
+        { code: -3 }
+      );
     }
 
     // Check 3: Check unreachable script in taproot (if not allowed)
     if (!config.MEMPOOL.ALLOW_UNREACHABLE) {
-      tx.ins.forEach(input => {
+      tx.ins.forEach((input) => {
         const witness = input.witness;
         // See BIP 341: Script validation rules
-        const hasAnnex = witness.length >= 2 &&
-          witness[witness.length - 1][0] === 0x50;
+        const hasAnnex =
+          witness.length >= 2 && witness[witness.length - 1][0] === 0x50;
         const scriptSpendMinLength = hasAnnex ? 3 : 2;
         const maybeScriptSpend = witness.length >= scriptSpendMinLength;
 
         if (maybeScriptSpend) {
-          const controlBlock = witness[witness.length - scriptSpendMinLength + 1];
-          if (controlBlock.length === 0 || !this.isValidLeafVersion(controlBlock[0])) {
+          const controlBlock =
+            witness[witness.length - scriptSpendMinLength + 1];
+          if (
+            controlBlock.length === 0 ||
+            !this.isValidLeafVersion(controlBlock[0])
+          ) {
             // Skip this input, it's not taproot
             return;
           }
@@ -1045,11 +1317,14 @@ export class Common {
               first === bitcoinjs.opcodes.OP_FALSE &&
               second === bitcoinjs.opcodes.OP_IF
             ) {
-              throw Object.assign(new Error('Unreachable taproot scripts not allowed'), { code: -5 });
+              throw Object.assign(
+                new Error('Unreachable taproot scripts not allowed'),
+                { code: -5 }
+              );
             }
           }
         }
-      })
+      });
     }
 
     // Pass through the input string untouched
@@ -1063,7 +1338,11 @@ export class Common {
 
     // Must be an integer between 0 and 255
     // Since we're parsing a byte
-    if (Math.floor(leafVersion) !== leafVersion || leafVersion < 0 || leafVersion > 255) {
+    if (
+      Math.floor(leafVersion) !== leafVersion ||
+      leafVersion < 0 ||
+      leafVersion > 255
+    ) {
       return false;
     }
     // "the leaf version cannot be odd"
@@ -1076,7 +1355,11 @@ export class Common {
       return true;
     }
     // and also 0x66, 0x7e, 0x80, 0x84, 0x96, 0x98, 0xba, 0xbc, 0xbe."
-    if ([0x66, 0x7e, 0x80, 0x84, 0x96, 0x98, 0xba, 0xbc, 0xbe].includes(leafVersion)) {
+    if (
+      [0x66, 0x7e, 0x80, 0x84, 0x96, 0x98, 0xba, 0xbc, 0xbe].includes(
+        leafVersion
+      )
+    ) {
       return true;
     }
     // Otherwise, invalid
@@ -1087,19 +1370,19 @@ export class Common {
 /**
  * Class to calculate average fee rates of a list of transactions
  * at certain weight percentiles, in a single pass
- * 
+ *
  * init with:
  *   maxWeight - the total weight to measure percentiles relative to (e.g. 4MW for a single block)
  *   percentileBandWidth - how many weight units to average over for each percentile (as a % of maxWeight)
  *   percentiles - an array of weight percentiles to compute, in %
- * 
+ *
  * then call .processNext(tx) for each transaction, in descending order
- * 
+ *
  * retrieve the final results with .getFeeStats()
  */
 export class OnlineFeeStatsCalculator {
   private maxWeight: number;
-  private percentiles = [10,25,50,75,90];
+  private percentiles = [10, 25, 50, 75, 90];
 
   private bandWidthPercent = 2;
   private bandWidth: number = 0;
@@ -1112,10 +1395,14 @@ export class OnlineFeeStatsCalculator {
   private minBandRate = Infinity;
   private maxBandRate = 0;
 
-  private feeRange: { avg: number, min: number, max: number }[] = [];
+  private feeRange: { avg: number; min: number; max: number }[] = [];
   private totalWeight: number = 0;
 
-  constructor (maxWeight: number, percentileBandWidth?: number, percentiles?: number[]) {
+  constructor(
+    maxWeight: number,
+    percentileBandWidth?: number,
+    percentiles?: number[]
+  ) {
     this.maxWeight = maxWeight;
     if (percentiles && percentiles.length) {
       this.percentiles = percentiles;
@@ -1126,11 +1413,18 @@ export class OnlineFeeStatsCalculator {
     this.bandWidth = this.maxWeight * (this.bandWidthPercent / 100);
     // add min/max percentiles aligned to the ends of the range
     this.percentiles.unshift(this.bandWidthPercent / 2);
-    this.percentiles.push(100 - (this.bandWidthPercent / 2));
+    this.percentiles.push(100 - this.bandWidthPercent / 2);
     this.setNextBounds();
   }
 
-  processNext(tx: { weight: number, fee: number, effectiveFeePerVsize?: number, feePerVsize?: number, rate?: number, txid: string }): void {
+  processNext(tx: {
+    weight: number;
+    fee: number;
+    effectiveFeePerVsize?: number;
+    feePerVsize?: number;
+    rate?: number;
+    txid: string;
+  }): void {
     let left = this.totalWeight;
     const right = this.totalWeight + tx.weight;
     if (!this.inBand && right <= this.leftBound) {
@@ -1141,9 +1435,11 @@ export class OnlineFeeStatsCalculator {
     while (left < right) {
       if (right > this.leftBound) {
         this.inBand = true;
-        const txRate = (tx.rate || tx.effectiveFeePerVsize || tx.feePerVsize || 0);
-        const weight = Math.min(right, this.rightBound) - Math.max(left, this.leftBound);
-        this.totalBandFee += (txRate * weight);
+        const txRate =
+          tx.rate || tx.effectiveFeePerVsize || tx.feePerVsize || 0;
+        const weight =
+          Math.min(right, this.rightBound) - Math.max(left, this.leftBound);
+        this.totalBandFee += txRate * weight;
         this.totalBandWeight += weight;
         this.maxBandRate = Math.max(this.maxBandRate, txRate);
         this.minBandRate = Math.min(this.minBandRate, txRate);
@@ -1152,8 +1448,14 @@ export class OnlineFeeStatsCalculator {
 
       if (left >= this.rightBound) {
         this.inBand = false;
-        const avgBandFeeRate = this.totalBandWeight ? (this.totalBandFee / this.totalBandWeight) : 0;
-        this.feeRange.unshift({ avg: avgBandFeeRate, min: this.minBandRate, max: this.maxBandRate });
+        const avgBandFeeRate = this.totalBandWeight
+          ? this.totalBandFee / this.totalBandWeight
+          : 0;
+        this.feeRange.unshift({
+          avg: avgBandFeeRate,
+          min: this.minBandRate,
+          max: this.maxBandRate,
+        });
         this.bandIndex++;
         this.setNextBounds();
         this.totalBandFee = 0;
@@ -1168,7 +1470,8 @@ export class OnlineFeeStatsCalculator {
   private setNextBounds(): void {
     const nextPercentile = this.percentiles[this.bandIndex];
     if (nextPercentile != null) {
-      this.leftBound = ((nextPercentile / 100) * this.maxWeight) - (this.bandWidth / 2);
+      this.leftBound =
+        (nextPercentile / 100) * this.maxWeight - this.bandWidth / 2;
       this.rightBound = this.leftBound + this.bandWidth;
     } else {
       this.leftBound = Infinity;
@@ -1178,8 +1481,14 @@ export class OnlineFeeStatsCalculator {
 
   getRawFeeStats(): WorkingEffectiveFeeStats {
     if (this.totalBandWeight > 0) {
-      const avgBandFeeRate = this.totalBandWeight ? (this.totalBandFee / this.totalBandWeight) : 0;
-      this.feeRange.unshift({ avg: avgBandFeeRate, min: this.minBandRate, max: this.maxBandRate });
+      const avgBandFeeRate = this.totalBandWeight
+        ? this.totalBandFee / this.totalBandWeight
+        : 0;
+      this.feeRange.unshift({
+        avg: avgBandFeeRate,
+        min: this.minBandRate,
+        max: this.maxBandRate,
+      });
     }
     while (this.feeRange.length < this.percentiles.length) {
       this.feeRange.unshift({ avg: 0, min: 0, max: 0 });
@@ -1188,7 +1497,7 @@ export class OnlineFeeStatsCalculator {
       minFee: this.feeRange[0].min,
       medianFee: this.feeRange[Math.floor(this.feeRange.length / 2)].avg,
       maxFee: this.feeRange[this.feeRange.length - 1].max,
-      feeRange: this.feeRange.map(f => f.avg),
+      feeRange: this.feeRange.map((f) => f.avg),
     };
   }
 
