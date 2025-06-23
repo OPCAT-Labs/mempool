@@ -1,8 +1,9 @@
 <div class="container-xl" [class.liquid-address]="network === 'liquid' || network === 'liquidtestnet'">
   <div class="title-address">
-    <h1 i18n="shared.address">Address</h1>
+    <h1 *ngIf="addressTypeInfo?.type !== 'contract'" i18n="shared.address">Address</h1>
+    <h1 *ngIf="addressTypeInfo?.type === 'contract'" i18n="shared.address">Contract</h1>
     <div class="tx-link">
-      <app-truncate [text]="addressString" [lastChars]="8" [link]="['/address/' | relativeUrl, addressString]">
+      <app-truncate [text]="addressString" [lastChars]="8" [link]="[(addressTypeInfo?.type === 'contract' ? '/contract/' : '/address/')  | relativeUrl, addressString]">
         <span class="qrSpan" (mouseover)="showQR = true" (mouseout)="showQR = false" (pointerdown)="showQR = true">
           <fa-icon [icon]="['fas', 'qrcode']" [fixedWidth]="true" [style.font-size]="isMobile ? '18px' : '12px'"></fa-icon>
           <div class="qr-wrapper" [hidden]="!showQR">
@@ -62,7 +63,7 @@
                     <ng-container *ngTemplateOutlet="volumeRow"></ng-container>
                   } @else {
                     <ng-container *ngTemplateOutlet="emptyTd"></ng-container>
-                  }                  
+                  }
                   <ng-container *ngTemplateOutlet="spacerCell"></ng-container>
                   <ng-container *ngTemplateOutlet="typeRow"></ng-container>
                 </tr>
@@ -73,7 +74,7 @@
       </div>
     </div>
 
-    <ng-container *ngIf="hasTapTree"> 
+    <ng-container *ngIf="hasTapTree">
       <br>
       <div class="title-tx">
         <h2 class="text-left" i18n="address.taproot-tree">Taproot Tree</h2>
@@ -81,7 +82,7 @@
       <div class="box">
         <div class="row">
           <div class="col-md">
-            <app-taproot-address-scripts [address]="addressTypeInfo"></app-taproot-address-scripts> 
+            <app-taproot-address-scripts [address]="addressTypeInfo"></app-taproot-address-scripts>
           </div>
         </div>
       </div>

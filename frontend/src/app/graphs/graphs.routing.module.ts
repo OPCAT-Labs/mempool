@@ -47,22 +47,30 @@ const routes: Routes = [
             path: '',
             component: MiningDashboardComponent,
           },
-        ]
+        ],
       },
       {
         path: 'acceleration',
-        data: { networks: ['bitcoin'], networkSpecific: true, onlySubnet: [''] },
+        data: {
+          networks: ['bitcoin'],
+          networkSpecific: true,
+          onlySubnet: [''],
+        },
         component: StartComponent,
         children: [
           {
             path: '',
             component: AcceleratorDashboardComponent,
-          }
-        ]
+          },
+        ],
       },
       {
         path: 'acceleration/list/:page',
-        data: { networks: ['bitcoin'], networkSpecific: true, onlySubnet: [''] },
+        data: {
+          networks: ['bitcoin'],
+          networkSpecific: true,
+          onlySubnet: [''],
+        },
         component: AccelerationsListComponent,
       },
       {
@@ -78,7 +86,7 @@ const routes: Routes = [
             path: '',
             component: MempoolBlockComponent,
           },
-        ]
+        ],
       },
       {
         path: 'address/:id',
@@ -87,7 +95,16 @@ const routes: Routes = [
         data: {
           ogImage: true,
           networkSpecific: true,
-        }
+        },
+      },
+      {
+        path: 'contract/:id',
+        children: [],
+        component: AddressComponent,
+        data: {
+          ogImage: true,
+          networkSpecific: true,
+        },
       },
       {
         path: 'wallet/:wallet',
@@ -96,7 +113,7 @@ const routes: Routes = [
         data: {
           ogImage: true,
           networkSpecific: true,
-        }
+        },
       },
       {
         path: 'graphs',
@@ -150,13 +167,20 @@ const routes: Routes = [
           },
           {
             path: 'acceleration/fees',
-            data: { networks: ['bitcoin'], networkSpecific: true, onlySubnet: [''] },
+            data: {
+              networks: ['bitcoin'],
+              networkSpecific: true,
+              onlySubnet: [''],
+            },
             component: AccelerationFeesGraphComponent,
           },
           {
             path: 'lightning',
             data: { preload: true, networks: ['bitcoin'] },
-            loadChildren: () => import ('@app/graphs/lightning-graphs.module').then(m => m.LightningGraphsModule),
+            loadChildren: () =>
+              import('@app/graphs/lightning-graphs.module').then(
+                (m) => m.LightningGraphsModule
+              ),
           },
           {
             path: '',
@@ -168,17 +192,21 @@ const routes: Routes = [
             data: { networks: ['bitcoin'] },
             component: BlockHealthGraphComponent,
           },
-        ]
+        ],
       },
       {
         path: '',
         component: StartComponent,
-        children: [{
-          path: '',
-          component: isCustomized ? CustomDashboardComponent : DashboardComponent,
-        }]
+        children: [
+          {
+            path: '',
+            component: isCustomized
+              ? CustomDashboardComponent
+              : DashboardComponent,
+          },
+        ],
       },
-    ]
+    ],
   },
 ];
 
@@ -186,18 +214,20 @@ if (window['__env']?.OFFICIAL_MEMPOOL_SPACE) {
   routes[0].children?.push({
     path: 'treasuries',
     component: StartComponent,
-    children: [{
-      path: '',
-      component: TreasuriesComponent,
-      data: {
-        networks: ['bitcoin'],
-        networkSpecific: true,
+    children: [
+      {
+        path: '',
+        component: TreasuriesComponent,
+        data: {
+          networks: ['bitcoin'],
+          networkSpecific: true,
+        },
       },
-    }]
+    ],
   });
 }
 
 @NgModule({
   imports: [RouterModule.forChild(routes)],
 })
-export class GraphsRoutingModule { }
+export class GraphsRoutingModule {}

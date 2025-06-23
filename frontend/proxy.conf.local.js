@@ -35,6 +35,16 @@ PROXY_CONFIG.push(
       },
     },
     {
+      context: ["/api/scripthash/**"],
+      target: `http://localhost:3006`,
+      secure: false,
+      changeOrigin: true,
+      proxyTimeout: 30000,
+      pathRewrite: {
+        "^/api/": "/",
+      },
+    },
+    {
       context: ["/api/address/**"],
       target: `http://localhost:3006`,
       secure: false,

@@ -1,7 +1,7 @@
 
 @if (similarity) {
   <div class="address-text">
-    <a class="address" style="display: contents;" [routerLink]="['/address/' | relativeUrl, address]" title="{{ address }}">
+    <a class="address" style="display: contents;" [routerLink]="[(isContract() ? '/contract/' : '/address/') | relativeUrl, address]" title="{{ address }}">
       <span class="prefix">{{ similarity.match.prefix }}</span>
       <span class="infix" [ngStyle]="{'text-decoration-color': groupColors[similarity.group % (groupColors.length)]}">{{ address.slice(similarity.match.prefix.length || 0, -similarity.match.postfix.length || undefined) }}</span>
       <span class="postfix"> {{ similarity.match.postfix }}</span>
@@ -11,7 +11,7 @@
     </span>
   </div>
 } @else {
-  <a class="address" [routerLink]="['/address/' | relativeUrl, address]" title="{{ address }}">
+  <a class="address" [routerLink]="[(isContract() ? '/contract/' : '/address/') | relativeUrl, address]" title="{{ address }}">
     <app-truncate [text]="address" [lastChars]="8"></app-truncate>
   </a>
 }
