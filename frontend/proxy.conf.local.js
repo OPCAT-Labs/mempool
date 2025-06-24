@@ -25,6 +25,16 @@ let PROXY_CONFIG = [];
 PROXY_CONFIG.push(
   ...[
     {
+      context: ["/testnet/api/**"],
+      target: `http://localhost:8999`,
+      secure: false,
+      changeOrigin: true,
+      proxyTimeout: 30000,
+      pathRewrite: {
+        "^/testnet/api/": "/api/v1/",
+      },
+    },
+    {
       context: ["/api/address/**/utxo"],
       target: `http://localhost:3006`,
       secure: false,
