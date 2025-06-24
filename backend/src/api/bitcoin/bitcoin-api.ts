@@ -73,6 +73,7 @@ class BitcoinApi implements AbstractBitcoinApi {
         });
       return tx;
     } catch (e) {
+      console.log('$getRawTransaction e', e);
       const tx = await this.$returnCoinbaseTransaction(txId);
       return tx;
     }
