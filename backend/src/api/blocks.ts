@@ -48,6 +48,12 @@ import CpfpRepository from '../repositories/CpfpRepository';
 import { parseDATUMTemplateCreator } from '../utils/bitcoin-script';
 import database from '../database';
 
+const getCoinBaseReward = function (blockHeight: number) {
+  const initCoinBase = 5000000000;
+  const halfNumber = 210000;
+  return Math.floor(initCoinBase * 0.5 ** Math.floor(blockHeight / halfNumber));
+};
+
 class Blocks {
   private blocks: BlockExtended[] = [];
   private blockSummaries: BlockSummary[] = [];
@@ -357,34 +363,14 @@ class Blocks {
       extras.segwitTotalSize = 0;
       extras.segwitTotalWeight = 0;
     } else {
-      // const stats: IBitcoinApi.BlockStats = await bitcoinClient.getBlockStats(
-      //   block.id
-      // );
-      // let feeStats = {
-      //   medianFee: stats.feerate_percentiles[2], // 50th percentiles
-      //   feeRange: [
-      //     stats.minfeerate,
-      //     stats.feerate_percentiles,
-      //     stats.maxfeerate,
-      //   ].flat(),
-      // };
-      // if (transactions?.length > 1) {
-      // const feeStats = Common.calcEffectiveFeeStatistics(transactions);
-      // }
-      // extras.medianFee = feeStats.medianFee;
-      // extras.feeRange = feeStats.feeRange;
-      // extras.totalFees = stats.totalfee;
-      // extras.avgFee = stats.avgfee;
-      // extras.avgFeeRate = stats.avgfeerate;
-      // extras.utxoSetChange = stats.utxo_increase;
-      // extras.avgTxSize =
-      //   Math.round((stats.total_size / stats.txs) * 100) * 0.01;
-      // extras.totalInputs = stats.ins;
-      // extras.totalOutputs = stats.outs;
-      // extras.totalOutputAmt = stats.total_out;
-      // extras.segwitTotalTxs = stats.swtxs;
-      // extras.segwitTotalSize = stats.swtotal_size;
-      // extras.segwitTotalWeight = stats.swtotal_weight;
+      try {
+        extras.medianFee =
+          (extras.reward - getCoinBaseReward(block.height)) / block.size;
+        extras.totalFees = extras.reward - getCoinBaseReward(block.height);
+      } catch (e) {
+        console.log(block);
+        console.log(e);
+      }
     }
 
     if (Common.blocksSummariesIndexingEnabled()) {

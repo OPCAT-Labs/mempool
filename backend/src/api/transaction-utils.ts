@@ -86,18 +86,6 @@ class TransactionUtils {
     forceCore = false,
     addMempoolData = false
   ): Promise<TransactionExtended> {
-    console.log(
-      'txid',
-      txId,
-      'addPrevouts',
-      addPrevouts,
-      'lazyPrevouts',
-      lazyPrevouts,
-      'forceCore',
-      forceCore,
-      'addMempoolData',
-      addMempoolData
-    );
     let transaction: IEsploraApi.Transaction;
     if (forceCore === true) {
       transaction = await bitcoinCoreApi.$getRawTransaction(
@@ -106,7 +94,6 @@ class TransactionUtils {
         addPrevouts,
         lazyPrevouts
       );
-      console.log('use bitcoinCoreApi');
     } else {
       transaction = await bitcoinApi.$getRawTransaction(
         txId,
@@ -114,7 +101,6 @@ class TransactionUtils {
         addPrevouts,
         lazyPrevouts
       );
-      console.log('use bitcoinApi');
     }
 
     if (Common.isLiquid()) {
@@ -126,6 +112,7 @@ class TransactionUtils {
       }
     }
 
+    transaction.weight = transaction.size;
     if (addMempoolData || !transaction?.status?.confirmed) {
       return this.extendMempoolTransaction(transaction);
     } else {
@@ -198,10 +185,10 @@ class TransactionUtils {
       // @ts-ignore
       return transaction;
     }
-    const feePerVbytes = (transaction.fee || 0) / (transaction.weight / 4);
+    const feePerVbytes = (transaction.fee || 0) / transaction.size;
     const transactionExtended: TransactionExtended = Object.assign(
       {
-        vsize: transaction.weight / 4,
+        vsize: transaction.size,
         feePerVsize: feePerVbytes,
         effectiveFeePerVsize: feePerVbytes,
       },
@@ -216,7 +203,7 @@ class TransactionUtils {
   public extendMempoolTransaction(
     transaction: IEsploraApi.Transaction
   ): MempoolTransactionExtended {
-    const vsize = Math.ceil(transaction.weight / 4);
+    const vsize = transaction.size;
     const fractionalVsize = transaction.weight / 4;
     let sigops = Common.isLiquid()
       ? 0
@@ -225,7 +212,7 @@ class TransactionUtils {
       : this.countSigops(transaction);
     // https://github.com/bitcoin/bitcoin/blob/e9262ea32a6e1d364fb7974844fadc36f931f8c6/src/policy/policy.cpp#L295-L298
     const adjustedVsize = Math.max(fractionalVsize, sigops * 5); // adjusted vsize = Max(weight, sigops * bytes_per_sigop) / witness_scale_factor
-    const feePerVbytes = (transaction.fee || 0) / fractionalVsize;
+    const feePerVbytes = (transaction.fee || 0) / transaction.size;
     const adjustedFeePerVsize = (transaction.fee || 0) / adjustedVsize;
     const effectiveFeePerVsize =
       transaction['effectiveFeePerVsize'] ||

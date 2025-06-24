@@ -434,11 +434,18 @@ class BitcoinApi implements AbstractBitcoinApi {
       this.rawMempoolCache = await this.$getRawMempoolVerbose();
     }
     if (this.rawMempoolCache && this.rawMempoolCache[transaction.txid]) {
-      mempoolEntry = this.rawMempoolCache[transaction.txid];
+      mempoolEntry = this.rawMempoolCache[transaction.txid] || {
+        // @ts-ignore
+        fees: { base: 0 },
+      };
     } else {
-      mempoolEntry = await this.$getMempoolEntry(transaction.txid);
+      // mempoolEntry = await this.$getMempoolEntry(transaction.txid);
+      mempoolEntry = {
+        // @ts-ignore
+        fees: { base: 0 },
+      };
     }
-    transaction.fee = Math.round(mempoolEntry.fees.base * 100000000);
+    transaction.fee = Math.round(mempoolEntry.fees?.base * 100000000);
     return transaction;
   }
 
