@@ -151,6 +151,7 @@ class BitcoindElectrsApi extends BitcoinApi implements AbstractBitcoinApi {
           false,
           true
         );
+        console.log('$getAddressTransactions', i, tx);
         transactions.push(tx);
         loadingIndicators.setProgress(
           'address-' + address,
