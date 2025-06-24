@@ -89,7 +89,7 @@
       [hasCpfp]="hasCpfp"
       (toggleCpfp$)="this.showCpfpDetails = !this.showCpfpDetails"
     ></app-transaction-details>
-  
+
     <app-cpfp-info *ngIf="showCpfpDetails" [cpfpInfo]="cpfpInfo" [tx]="transaction"></app-cpfp-info>
     <br>
 
@@ -162,11 +162,11 @@
                 <td [innerHTML]="'&lrm;' + (transaction.size | bytes: 2)"></td>
               </tr>
               <tr>
-                <td i18n="transaction.vsize|Transaction Virtual Size">Virtual size</td>
+                <td i18n="transaction.vsize|Transaction Virtual Size">Size</td>
                 <td [innerHTML]="'&lrm;' + (transaction.weight / 4 | vbytes: 2)"></td>
               </tr>
               <tr *ngIf="adjustedVsize">
-                <td><ng-container i18n="transaction.adjusted-vsize|Transaction Adjusted VSize">Adjusted vsize</ng-container>
+                <td><ng-container i18n="transaction.adjusted-vsize|Transaction Adjusted VSize">Size</ng-container>
                   <a class="info-link" [routerLink]="['/docs/faq/' | relativeUrl]" fragment="what-is-adjusted-vsize">
                     <fa-icon [icon]="['fas', 'info-circle']" [fixedWidth]="true"></fa-icon>
                   </a>
