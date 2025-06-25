@@ -2120,14 +2120,14 @@ export function convertTransactions(transactions: Transaction[]): void {
       );
     });
     transaction.vin.forEach((vin) => {
-      if (!vin.prevout.scriptpubkey_address) {
+      if (vin.prevout && !vin.prevout.scriptpubkey_address) {
         vin.prevout.scriptpubkey_address = crypto.enc.Hex.stringify(
           crypto.SHA256(crypto.enc.Hex.parse(vin.prevout.scriptpubkey))
         );
+        vin.prevout.scriptpubkey_type = translateScriptPubKeyType(
+          vin.prevout.scriptpubkey_type
+        );
       }
-      vin.prevout.scriptpubkey_type = translateScriptPubKeyType(
-        vin.prevout.scriptpubkey_type
-      );
     });
   });
 }
