@@ -1274,6 +1274,7 @@ class BitcoinRoutes {
       const txIdResult = await bitcoinApi.$sendRawTransaction(rawTx);
       res.send(txIdResult);
     } catch (e: any) {
+      console.log('e', e);
       handleError(
         req,
         res,
