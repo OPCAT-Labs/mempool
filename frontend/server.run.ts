@@ -69,7 +69,7 @@ function app() {
   server.get(
     '/api/v1/ws',
     createProxyMiddleware({
-      target: 'ws://testnet.opcatlabs.io/api/v1/ws',
+      target: 'ws://localhost:4200/api/v1/ws',
       changeOrigin: true,
       ws: true,
       logLevel: 'debug',
