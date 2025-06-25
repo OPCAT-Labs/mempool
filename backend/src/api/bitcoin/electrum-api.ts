@@ -281,14 +281,13 @@ class BitcoindElectrsApi extends BitcoinApi implements AbstractBitcoinApi {
     if (fromCache) {
       return Promise.resolve(fromCache);
     }
+    console.log(
+      'this.encodeScriptHash(scriptHash)',
+      this.encodeScriptHash(scriptHash)
+    );
     return this.electrumClient
       .blockchainScripthash_getHistory(this.encodeScriptHash(scriptHash))
       .then((history) => {
-        console.log(
-          'this.encodeScriptHash(scriptHash)',
-          this.encodeScriptHash(scriptHash),
-          history
-        );
         memoryCache.set('Scripthash_getHistory', scriptHash, history, 2);
         return history;
       });
