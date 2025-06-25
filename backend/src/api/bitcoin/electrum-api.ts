@@ -129,6 +129,7 @@ class BitcoindElectrsApi extends BitcoinApi implements AbstractBitcoinApi {
       loadingIndicators.setProgress('address-' + address, 0);
 
       const transactions: IEsploraApi.Transaction[] = [];
+      console.log('addressInfo', addressInfo);
       const history = await this.$getScriptHashHistory(
         addressInfo.scriptPubKey
       );
