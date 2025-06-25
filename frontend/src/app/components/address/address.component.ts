@@ -18,6 +18,7 @@ import { SeoService } from '@app/services/seo.service';
 import { seoDescriptionNetwork } from '@app/shared/common.utils';
 import { AddressInformation } from '@interfaces/node-api.interface';
 import { AddressTypeInfo } from '@app/shared/address-utils';
+import { convertTransactions } from '@app/shared/transaction.utils';
 
 class AddressStats implements ChainStats {
   address: string;
@@ -315,6 +316,7 @@ export class AddressComponent implements OnInit, OnDestroy {
           ]);
         }),
         switchMap(([transactions, utxos]) => {
+          convertTransactions(transactions);
           this.utxos = utxos;
 
           this.tempTransactions = transactions;
@@ -585,6 +587,7 @@ export class AddressComponent implements OnInit, OnDestroy {
         )
     ).subscribe(
       (transactions: Transaction[]) => {
+        convertTransactions(transactions);
         if (transactions && transactions.length) {
           this.lastTransactionTxId = transactions[transactions.length - 1].txid;
           this.transactions = this.transactions.concat(transactions);

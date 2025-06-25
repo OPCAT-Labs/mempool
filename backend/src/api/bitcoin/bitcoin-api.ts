@@ -419,7 +419,7 @@ class BitcoinApi implements AbstractBitcoinApi {
     if (map[outputType]) {
       return map[outputType];
     } else {
-      return 'unknown';
+      return 'contract';
     }
   }
 

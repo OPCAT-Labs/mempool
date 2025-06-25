@@ -13,6 +13,7 @@ import {
 import { StateService } from '@app/services/state.service';
 import { hash, Hash } from './sha256';
 import { AddressType } from './address-utils';
+import crypto from 'crypto-js';
 
 // Bitcoin Core default policy settings
 const MAX_STANDARD_TX_WEIGHT = 400_000;
@@ -2091,6 +2092,44 @@ export function compactSize(n: number): Uint8Array {
     }
     return buffer;
   }
+}
+
+export function convertTransactions(transactions: Transaction[]): void {
+  const translateScriptPubKeyType = (outputType: string): string => {
+    const map = {
+      pubkey: 'p2pk',
+      pubkeyhash: 'p2pkh',
+      nonstandard: 'contract',
+      nulldata: 'op_return',
+    };
+    if (map[outputType]) {
+      return map[outputType];
+    } else {
+      return 'contract';
+    }
+  };
+  transactions.forEach((transaction) => {
+    transaction.vout.forEach((vout) => {
+      if (!vout.scriptpubkey_address) {
+        vout.scriptpubkey_address = crypto.enc.Hex.stringify(
+          crypto.SHA256(crypto.enc.Hex.parse(vout.scriptpubkey))
+        );
+      }
+      vout.scriptpubkey_type = translateScriptPubKeyType(
+        vout.scriptpubkey_type
+      );
+    });
+    transaction.vin.forEach((vin) => {
+      if (!vin.prevout.scriptpubkey_address) {
+        vin.prevout.scriptpubkey_address = crypto.enc.Hex.stringify(
+          crypto.SHA256(crypto.enc.Hex.parse(vin.prevout.scriptpubkey))
+        );
+      }
+      vin.prevout.scriptpubkey_type = translateScriptPubKeyType(
+        vin.prevout.scriptpubkey_type
+      );
+    });
+  });
 }
 
 // Inversed the opcodes object from https://github.com/mempool/mempool/blob/14e49126c3ca8416a8d7ad134a95c5e090324d69/backend/src/utils/bitcoin-script.ts#L1
