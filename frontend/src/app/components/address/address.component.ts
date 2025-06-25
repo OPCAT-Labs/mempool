@@ -283,6 +283,10 @@ export class AddressComponent implements OnInit, OnDestroy {
         }),
         switchMap((address) => {
           this.address = address;
+          // @ts-ignore
+          this.address.address =
+            // @ts-ignore
+            this.address.address || this.address.scripthash;
           this.updateChainStats();
           this.isLoadingAddress = false;
           this.isLoadingTransactions = true;
@@ -570,11 +574,9 @@ export class AddressComponent implements OnInit, OnDestroy {
     }
     this.isLoadingTransactions = true;
     this.retryLoadMore = false;
-    (this.address.is_pubkey
-      ? this.electrsApiService.getScriptHashTransactions$(
-          (this.address.address.length === 66 ? '21' : '41') +
-            this.address.address +
-            'ac',
+    (this.addressTypeInfo && this.addressTypeInfo.type === 'contract'
+      ? this.electrsApiService.getScriptHashTransactions(
+          this.addressTypeInfo.address,
           this.lastTransactionTxId
         )
       : this.electrsApiService.getAddressTransactions$(
