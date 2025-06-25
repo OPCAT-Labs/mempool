@@ -914,6 +914,7 @@ class BitcoinRoutes {
         handleError(req, res, 413, e.message);
         return;
       }
+      console.log('e', e);
       handleError(req, res, 500, 'Failed to get address transactions');
     }
   }
