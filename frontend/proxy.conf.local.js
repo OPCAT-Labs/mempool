@@ -66,12 +66,12 @@ PROXY_CONFIG.push(
     },
     {
       context: ["/api/address/**/txs"],
-      target: `http://localhost:8999`,
+      target: `http://localhost:3006`,
       secure: false,
       changeOrigin: true,
       proxyTimeout: 30000,
       pathRewrite: {
-        "^/api/": "/api/v1/",
+        "^/api/": "/",
       },
     },
     {
