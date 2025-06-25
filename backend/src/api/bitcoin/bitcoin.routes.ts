@@ -1281,7 +1281,10 @@ class BitcoinRoutes {
         400,
         e.message && e.code
           ? 'sendrawtransaction RPC error: ' +
-              JSON.stringify({ code: e.code, message: e.stack })
+              JSON.stringify({
+                code: e.code,
+                message: e.stack.split('\n').replace('Error: '),
+              })
           : 'Failed to send raw transaction'
       );
     }
