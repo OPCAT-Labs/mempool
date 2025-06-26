@@ -7,7 +7,6 @@
       <h1 class="title truncated"><app-truncate [text]="txId"></app-truncate></h1>
     </div>
     <div *ngIf="network !== 'liquid' && network !== 'liquidtestnet'" class="features">
-      <app-tx-features [tx]="tx"></app-tx-features>
       <span *ngIf="cpfpInfo && (cpfpInfo?.bestDescendant || cpfpInfo?.descendants?.length || cpfpInfo?.ancestors?.length)" class="badge badge-primary ml-1 mr-1">
         CPFP
       </span>
