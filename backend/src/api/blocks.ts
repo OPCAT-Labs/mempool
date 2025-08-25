@@ -49,7 +49,7 @@ import { parseDATUMTemplateCreator } from '../utils/bitcoin-script';
 import database from '../database';
 
 const getCoinBaseReward = function (blockHeight: number) {
-  const initCoinBase = 5000000000;
+  const initCoinBase = 0;
   const halfNumber = 210000;
   return Math.floor(initCoinBase * 0.5 ** Math.floor(blockHeight / halfNumber));
 };
