@@ -29,6 +29,7 @@ import bitcoinRoutes from './api/bitcoin/bitcoin.routes';
 import servicesRoutes from './api/services/services-routes';
 import priceUpdater from './tasks/price-updater';
 import chainTips from './api/chain-tips';
+import fuzzysearchprefix from './api/cat20/fuzzysearchprefix';
 import { AxiosError } from 'axios';
 import v8 from 'v8';
 import { formatBytes, getBytesUnit } from './utils/format';
@@ -361,6 +362,7 @@ class Server {
   }
 
   setUpHttpApiRoutes(): void {
+    fuzzysearchprefix.initRoutes(this.app);
     bitcoinRoutes.initRoutes(this.app);
     if (config.MEMPOOL.OFFICIAL) {
       bitcoinCoreRoutes.initRoutes(this.app);
