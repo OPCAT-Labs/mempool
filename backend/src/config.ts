@@ -133,6 +133,7 @@ interface IConfig {
     MEMPOOL_ONION: string;
     LIQUID_API: string;
     LIQUID_ONION: string;
+	TRACKURL: string;
   };
   MAXMIND: {
     ENABLED: boolean;
@@ -304,6 +305,7 @@ const defaults: IConfig = {
     'MEMPOOL_ONION': 'http://mempoolhqx4isw62xs7abwphsq7ldayuidyx2v2oethdhhj6mlo2r6ad.onion/api/v1',
     'LIQUID_API': 'https://liquid.network/api/v1',
     'LIQUID_ONION': 'http://liquidmom47f6s3m53ebfxn47p76a6tlnxib3wp6deux7wuzotdr6cyd.onion/api/v1'
+	'TRACKURL': 'http://127.0.0.1:3000/api'
   },
   'MAXMIND': {
     'ENABLED': false,
