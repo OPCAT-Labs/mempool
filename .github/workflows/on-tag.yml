@@ -4,6 +4,8 @@ env:
   TAG_FMT: "^refs/tags/(((.?[0-9]+){3,4}))$"
   DOCKER_BUILDKIT: 1  # Enable BuildKit for better performance
   COMPOSE_DOCKER_CLI_BUILD: 0
+  REGISTRY: ghcr.io
+  IMAGE_PREFIX: ghcr.io/${{ github.repository_owner }}
 
 on:
   push:
@@ -13,6 +15,7 @@ on:
 
 permissions:
   contents: read
+  packages: write
 
 jobs:
   build:
@@ -23,7 +26,7 @@ jobs:
           - backend
     runs-on: ubuntu-latest
     timeout-minutes: 120
-    name: Build and push to DockerHub
+    name: Build and push to GHCR
     steps:
       - name: Replace the current swap file
         shell: bash
@@ -63,8 +66,12 @@ jobs:
       - name: Add SHORT_SHA env property with commit short sha
         run: echo "SHORT_SHA=`echo ${GITHUB_SHA} | cut -c1-8`" >> $GITHUB_ENV
 
-      - name: Login to Docker for building
-        run: echo "${{ secrets.DOCKER_PASSWORD }}" | docker login -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Checkout project
         uses: actions/checkout@v4
@@ -104,8 +111,8 @@ jobs:
           --cache-from "type=local,src=/tmp/.buildx-cache" \
           --cache-to "type=local,dest=/tmp/.buildx-cache,mode=max" \
           --platform linux/amd64,linux/arm64 \
-          --tag ${{ secrets.DOCKER_HUB_USER }}/${{ matrix.service }}:$TAG \
-          --tag ${{ secrets.DOCKER_HUB_USER }}/${{ matrix.service }}:latest \
+          --tag ghcr.io/${{ github.repository_owner }}/mempool-${{ matrix.service }}:$TAG \
+          --tag ghcr.io/${{ github.repository_owner }}/mempool-${{ matrix.service }}:latest \
           --build-context rustgbt=./rust \
           --build-context backend=./backend \
           --output "type=registry,push=true" \
