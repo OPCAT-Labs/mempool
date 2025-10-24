@@ -104,7 +104,6 @@ export class SearchFormComponent implements OnInit {
 
   ngOnInit(): void {
     this.env = this.stateService.env;
-    console.log('module init', this.env);
     this.regexAddress = getRegex(
       'address',
       (this.env.ROOT_NETWORK as any) || 'mainnet'
