@@ -255,14 +255,6 @@ export class SearchFormComponent implements OnInit {
         const matchesBlockHash = this.regexBlockhash.test(searchText);
         const matchesAddress =
           !matchesTxId && this.regexAddress.test(searchText);
-        console.log(
-          "getRegex('address', 'mainnet')",
-          getRegex('address', 'mainnet').test(searchText)
-        );
-        console.log(
-          "getRegex('address', 'testnet')",
-          getRegex('address', 'testnet').test(searchText)
-        );
         const publicKey = matchesAddress && searchText.startsWith('0');
         const otherNetworks = findOtherNetworks(
           searchText,
