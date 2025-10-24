@@ -35,6 +35,9 @@ jobs:
         with:
           platforms: linux/amd64,linux/arm64
 
+      - name: Set lowercase repository owner
+        run: echo "REPO_OWNER_LOWER=$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')" >> $GITHUB_ENV
+
       - name: Login to GitHub Container Registry
         uses: docker/login-action@v3
         with:
@@ -46,7 +49,7 @@ jobs:
         id: source-manifest
         run: |
           set -e
-          IMAGE_NAME="ghcr.io/${{ github.repository_owner }}/mempool-${{ matrix.service }}"
+          IMAGE_NAME="ghcr.io/${REPO_OWNER_LOWER}/mempool-${{ matrix.service }}"
           echo "Fetching source manifest..."
           MANIFEST=$(docker manifest inspect ${IMAGE_NAME}:${{ github.event.inputs.tag }})
           if [ -z "$MANIFEST" ]; then
