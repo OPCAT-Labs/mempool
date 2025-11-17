@@ -40,6 +40,7 @@ import { ApiService } from '@app/services/api.service';
 import { SearchResultsComponent } from '@components/search-form/search-results/search-results.component';
 import {
   Network,
+  NETWORKS,
   findOtherNetworks,
   getRegex,
   getTargetUrl,
@@ -74,6 +75,7 @@ export class SearchFormComponent implements OnInit {
   }
 
   regexAddress = getRegex('address', 'mainnet'); // Default to mainnet
+  regexAddressAnyNetwork: RegExp; // Matches address from any network
   regexBlockhash = getRegex('blockhash', 'mainnet');
   regexTransaction = getRegex('transaction');
   regexBlockheight = getRegex('blockheight');
@@ -108,6 +110,14 @@ export class SearchFormComponent implements OnInit {
       'address',
       (this.env.ROOT_NETWORK as any) || 'mainnet'
     );
+
+    // Initialize regex that matches addresses from any network
+    this.regexAddressAnyNetwork = new RegExp(
+      '^(?:' +
+      NETWORKS.map(net => getRegex('address', net).source.slice(1, -1)).join('|') +
+      ')$'
+    );
+
     this.stateService.networkChanged$.subscribe((network) => {
       this.network = network;
       // TODO: Eventually change network type here from string to enum of consts
@@ -254,13 +264,9 @@ export class SearchFormComponent implements OnInit {
           !this.regexBlockhash.test(searchText);
         const matchesBlockHash = this.regexBlockhash.test(searchText);
         const matchesAddress =
-          !matchesTxId && this.regexAddress.test(searchText);
+          !matchesTxId && this.regexAddressAnyNetwork.test(searchText);
         const publicKey = matchesAddress && searchText.startsWith('0');
-        const otherNetworks = findOtherNetworks(
-          searchText,
-          (this.network as any) || 'mainnet',
-          this.env
-        );
+        const otherNetworks: any[] = [];
         const liquidAsset = this.assets ? this.assets[searchText] || [] : [];
         const pools = this.pools
           .filter((pool) =>
@@ -350,7 +356,7 @@ export class SearchFormComponent implements OnInit {
 
       if (
         !this.regexTransaction.test(searchText) &&
-        this.regexAddress.test(searchText)
+        this.regexAddressAnyNetwork.test(searchText)
       ) {
         this.navigate('/address/', searchText);
       } else if (this.regexBlockhash.test(searchText)) {
