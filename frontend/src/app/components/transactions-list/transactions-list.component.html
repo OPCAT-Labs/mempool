@@ -155,13 +155,13 @@
                       <tr *ngIf="vin.scriptsig">
                         <td>Unlocking Script (HEX)</td>
                         <td style="text-align: left;">
-                          <div class="hex-script-display" [class.scrollable]="vin.scriptsig.length > 200">{{ vin.scriptsig }}</div>
+                          <div class="hex-script-display" [class.scrollable]="vin.scriptsig.length > 80">{{ vin.scriptsig }}</div>
                         </td>
                       </tr>
                       <tr *ngIf="vin.prevout?.scriptpubkey">
                         <td>Prevout Script (HEX)</td>
                         <td style="text-align: left;">
-                          <div class="hex-script-display" [class.scrollable]="vin.prevout.scriptpubkey.length > 200">{{ vin.prevout.scriptpubkey }}</div>
+                          <div class="hex-script-display" [class.scrollable]="vin.prevout.scriptpubkey.length > 80">{{ vin.prevout.scriptpubkey }}</div>
                         </td>
                       </tr>
                       <tr>
@@ -291,7 +291,7 @@
                       <tr>
                         <td i18n="transactions-list.scriptpubkey.hex|ScriptPubKey (HEX)">ScriptPubKey (HEX)</td>
                         <td style="text-align: left;">
-                          <div class="hex-script-display" [class.scrollable]="vout.scriptpubkey.length > 200">{{ vout.scriptpubkey }}</div>
+                          <div class="hex-script-display" [class.scrollable]="vout.scriptpubkey.length > 80">{{ vout.scriptpubkey }}</div>
                         </td>
                       </tr>
                       <tr>
