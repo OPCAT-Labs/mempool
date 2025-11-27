@@ -152,6 +152,14 @@
                 <td [attr.colspan]="tx['_showSignatures'] ? 4 : 3" class="details-container" >
                   <table class="table table-striped table-fixed table-borderless details-table mb-3">
                     <tbody>
+                      <tr *ngIf="vin.scriptsig">
+                        <td>Unlocking Script (HEX)</td>
+                        <td style="text-align: left;">{{ vin.scriptsig }}</td>
+                      </tr>
+                      <tr *ngIf="vin.prevout?.scriptpubkey">
+                        <td>Prevout Script (HEX)</td>
+                        <td style="text-align: left;">{{ vin.prevout.scriptpubkey }}</td>
+                      </tr>
                       <tr>
                         <td i18n="transactions-list.nsequence">nSequence</td>
                         <td style="text-align: left;">{{ formatHex(vin.sequence) }}</td>
