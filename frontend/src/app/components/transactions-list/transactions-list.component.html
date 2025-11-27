@@ -152,41 +152,10 @@
                 <td [attr.colspan]="tx['_showSignatures'] ? 4 : 3" class="details-container" >
                   <table class="table table-striped table-fixed table-borderless details-table mb-3">
                     <tbody>
-                      <ng-template [ngIf]="vin.scriptsig">
-                        <tr>
-                          <td i18n="transactions-list.scriptsig.asm|ScriptSig (ASM)">ScriptSig (ASM)</td>
-                          <td style="text-align: left;">
-                            <app-asm
-                              [asm]="vin.scriptsig_asm"
-                              [annotations]="{ signatures: tx['_sigmap'], selectedSig: selectedSig?.txIndex === i && selectedSig?.vindex === vindex ? selectedSig.sig : null }"
-                              (showSigInfo)="showSigInfo(i, vindex, $event)"
-                              (hideSigInfo)="hideSigInfo()"
-                            ></app-asm>
-                          </td>
-                        </tr>
-                        <tr>
-                          <td i18n="transactions-list.scriptsig.hex|ScriptSig (HEX)">ScriptSig (HEX)</td>
-                          <td style="text-align: left;">{{ vin.scriptsig }}</td>
-                        </tr>
-                      </ng-template>
-                      <tr *ngIf="vin.inner_redeemscript_asm">
-                        <td i18n="transactions-list.p2sh-redeem-script">P2SH redeem script</td>
-                        <td style="text-align: left;" [innerHTML]="vin.inner_redeemscript_asm | asmStyler"></td>
-                      </tr>
                       <tr>
                         <td i18n="transactions-list.nsequence">nSequence</td>
                         <td style="text-align: left;">{{ formatHex(vin.sequence) }}</td>
                       </tr>
-                      <ng-template [ngIf]="vin.prevout">
-                        <tr>
-                          <td i18n="transactions-list.previous-output-script">Previous output script</td>
-                          <td style="text-align: left;" [innerHTML]="vin.prevout.scriptpubkey_asm | asmStyler"></td>
-                        </tr>
-                        <tr>
-                          <td i18n="transactions-list.previous-output-type">Previous output type</td>
-                          <td style="text-align: left;">{{ vin.prevout.scriptpubkey_type?.toUpperCase() }}</td>
-                        </tr>
-                    </ng-template>
                     </tbody>
                   </table>
                 </td>
@@ -308,20 +277,12 @@
                   <table class="table table-striped table-borderless details-table mb-3">
                     <tbody>
                       <tr>
-                        <td i18n="transactions-list.scriptpubkey.asm|ScriptPubKey (ASM)">ScriptPubKey (ASM)</td>
-                        <td style="text-align: left;" [innerHTML]="vout.scriptpubkey_asm | asmStyler"></td>
-                      </tr>
-                      <tr>
                         <td i18n="transactions-list.scriptpubkey.hex|ScriptPubKey (HEX)">ScriptPubKey (HEX)</td>
                         <td style="text-align: left;">{{ vout.scriptpubkey }}</td>
                       </tr>
                       <tr>
                         <td i18n="transactions-list.data|Data">Data</td>
                         <td style="text-align: left;">{{ vout.data }}</td>
-                      </tr>
-                      <tr *ngIf="vout.scriptpubkey_type == 'op_return'">
-                        <td>OP_RETURN <span>data</span></td>
-                        <td style="text-align: left;">{{ vout.scriptpubkey_asm | hex2ascii }}</td>
                       </tr>
                       <tr *ngIf="vout.scriptpubkey_type">
                         <td i18n="transactions-list.vout.scriptpubkey-type">Type</td>
