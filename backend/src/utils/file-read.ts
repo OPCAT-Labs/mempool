@@ -4,7 +4,10 @@ import config from '../config';
 
 function readFile(filePath: string, bufferSize?: number): string[] {
   const fileSize = fs.statSync(filePath).size;
-  const chunkSize = bufferSize || fileSize;
+  if (fileSize === 0) {
+    return [];
+  }
+  const chunkSize = Math.min(bufferSize || fileSize, fileSize);
   const fileDescriptor = fs.openSync(filePath, 'r');
   const buffer = Buffer.alloc(chunkSize);
 
