@@ -7,7 +7,7 @@ import cpfpRepository from '../repositories/CpfpRepository';
 import { RowDataPacket } from 'mysql2';
 
 class DatabaseMigration {
-  private static currentVersion = 98;
+  private static currentVersion = 99;
   private queryTimeout = 3600_000;
   private statisticsAddedIndexed = false;
   private uniqueLogs: string[] = [];
@@ -133,7 +133,7 @@ class DatabaseMigration {
       await this.$executeQuery('TRUNCATE blocks;');  // Need to re-index
       // Cleanup original blocks fields type
       await this.$executeQuery('ALTER TABLE blocks MODIFY `height` integer unsigned NOT NULL DEFAULT "0"');
-      await this.$executeQuery('ALTER TABLE blocks MODIFY `tx_count` smallint unsigned NOT NULL DEFAULT "0"');
+      await this.$executeQuery('ALTER TABLE blocks MODIFY `tx_count` int unsigned NOT NULL DEFAULT "0"');
       await this.$executeQuery('ALTER TABLE blocks MODIFY `size` integer unsigned NOT NULL DEFAULT "0"');
       await this.$executeQuery('ALTER TABLE blocks MODIFY `weight` integer unsigned NOT NULL DEFAULT "0"');
       await this.$executeQuery('ALTER TABLE blocks MODIFY `difficulty` double NOT NULL DEFAULT "0"');
@@ -813,7 +813,7 @@ class DatabaseMigration {
 
         // Version 6
         await this.$executeQuery('ALTER TABLE blocks MODIFY `height` integer unsigned NOT NULL DEFAULT "0"');
-        await this.$executeQuery('ALTER TABLE blocks MODIFY `tx_count` smallint unsigned NOT NULL DEFAULT "0"');
+        await this.$executeQuery('ALTER TABLE blocks MODIFY `tx_count` int unsigned NOT NULL DEFAULT "0"');
         await this.$executeQuery('ALTER TABLE blocks MODIFY `size` integer unsigned NOT NULL DEFAULT "0"');
         await this.$executeQuery('ALTER TABLE blocks MODIFY `weight` integer unsigned NOT NULL DEFAULT "0"');
         await this.$executeQuery('ALTER TABLE blocks MODIFY `difficulty` double NOT NULL DEFAULT "0"');
@@ -1153,6 +1153,12 @@ class DatabaseMigration {
     if (databaseSchemaVersion < 98 && config.MEMPOOL.NETWORK === 'mainnet') {
       await this.$executeQuery('UPDATE blocks_summaries SET version = 0 WHERE height >= 896070;');
       await this.updateToSchemaVersion(98);
+    }
+
+    // Increase tx_count column size to support blocks with more than 65535 transactions
+    if (databaseSchemaVersion < 99) {
+      await this.$executeQuery('ALTER TABLE `blocks` MODIFY `tx_count` INT UNSIGNED NOT NULL DEFAULT 0');
+      await this.updateToSchemaVersion(99);
     }
   }
 
