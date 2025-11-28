@@ -122,6 +122,10 @@ function downloadMiningPoolLogos$() {
           }
           let downloadedCount = 0;
           for (const poolLogo of poolLogos) {
+            // Skip directories and entries without download_url
+            if (poolLogo.type !== 'file' || !poolLogo.download_url) {
+              continue;
+            }
             if (verbose) {
               console.log(`${LOG_TAG} Processing ${poolLogo.name}`);
             }
