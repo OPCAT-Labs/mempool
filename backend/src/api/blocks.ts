@@ -274,24 +274,41 @@ class Blocks {
    * @param block
    * @returns BlockSummary
    */
-  public summarizeBlock(block: IBitcoinApi.VerboseBlock): BlockSummary {
+  public async summarizeBlock(block: IBitcoinApi.VerboseBlock): Promise<BlockSummary> {
     if (Common.isLiquid()) {
       block = this.convertLiquidFees(block);
     }
-    const stripped = block.tx.map((tx: IBitcoinApi.VerboseTransaction) => {
-      return {
-        txid: tx.txid,
-        vsize: tx.weight / 4,
-        fee: tx.fee ? Math.round(tx.fee * 100000000) : 0,
+    const stripped: TransactionClassified[] = [];
+
+    for (const tx of block.tx) {
+      // Check if tx is a string (txid) or an object (full transaction)
+      // getblock with verbosity=1 returns txids as strings, verbosity=2 returns full tx objects
+      let fullTx: IBitcoinApi.VerboseTransaction;
+      if (typeof tx === 'string') {
+        // tx is just a txid string, need to fetch full transaction
+        try {
+          fullTx = await bitcoinClient.getRawTransaction(tx, true);
+        } catch (e) {
+          logger.warn(`Failed to get raw transaction ${tx}: ${e instanceof Error ? e.message : e}`);
+          continue;
+        }
+      } else {
+        fullTx = tx;
+      }
+
+      stripped.push({
+        txid: fullTx.txid,
+        vsize: fullTx.weight ? fullTx.weight / 4 : (fullTx.vsize || 0),
+        fee: fullTx.fee ? Math.round(fullTx.fee * 100000000) : 0,
         value: Math.round(
-          tx.vout.reduce(
+          (fullTx.vout || []).reduce(
             (acc, vout) => acc + (vout.value ? vout.value : 0),
             0
           ) * 100000000
         ),
         flags: 0,
-      };
-    });
+      });
+    }
 
     return {
       id: block.hash,
@@ -604,7 +621,15 @@ class Blocks {
             ); // This will index the block summary
           }
         } else {
-          await this.$getStrippedBlockTransactions(block.hash, true, true); // This will index the block summary
+          // Call Core RPC
+          const verboseBlock = await bitcoinClient.getBlock(block.hash, true);
+          const summary = await this.summarizeBlock(verboseBlock);
+          await BlocksSummariesRepository.$saveTransactions(
+            block.height,
+            block.hash,
+            summary.transactions,
+            0
+          );
         }
 
         // Logging
@@ -1731,7 +1756,7 @@ class Blocks {
       } else {
         // Call Core RPC
         const block = await bitcoinClient.getBlock(hash, true);
-        summary = this.summarizeBlock(block);
+        summary = await this.summarizeBlock(block);
         height = block.height;
       }
     }
@@ -1899,7 +1924,7 @@ class Blocks {
           } else {
             // Call Core RPC
             const block = await bitcoinClient.getBlock(cleanBlock.hash, true);
-            summary = this.summarizeBlock(block);
+            summary = await this.summarizeBlock(block);
           }
 
           await BlocksSummariesRepository.$saveTransactions(

@@ -1394,7 +1394,7 @@ class BlocksRepository {
         } else {
           // Call Core RPC
           const block = await bitcoinClient.getBlock(dbBlk.id, true);
-          summary = blocks.summarizeBlock(block);
+          summary = await blocks.summarizeBlock(block);
         }
 
         await BlocksSummariesRepository.$saveTransactions(
