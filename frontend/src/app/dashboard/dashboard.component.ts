@@ -461,16 +461,7 @@ export class DashboardComponent implements OnInit, OnDestroy, AfterViewInit {
   }
 
   getBlockFillGradient(block: BlockExtended): string {
-    const percent = Math.min((block.size / this.stateService.env.BLOCK_WEIGHT_UNITS) * 100, 100);
-    // Gradient from deep blue (low) to purple/pink (high)
-    if (percent < 25) {
-      return 'linear-gradient(to right, #1a3a5c, #2d5a87)';
-    } else if (percent < 50) {
-      return 'linear-gradient(to right, #2d5a87, #5e4fa2)';
-    } else if (percent < 75) {
-      return 'linear-gradient(to right, #5e4fa2, #9e4fa2)';
-    } else {
-      return 'linear-gradient(to right, #9e4fa2, #d53e7e)';
-    }
+    // Gradient from blue to purple to pink (like mempool.space)
+    return 'linear-gradient(to right, #5e4fa2, #b5367a)';
   }
 }

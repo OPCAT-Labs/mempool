@@ -364,16 +364,8 @@ export class BlockchainBlocksComponent implements OnInit, OnChanges, OnDestroy {
   }
 
   getGradientByFillPercent(percent: number): [string, string] {
-    // Gradient from deep blue (low) to purple/pink (high)
-    if (percent < 25) {
-      return ['#1a3a5c', '#2d5a87'];
-    } else if (percent < 50) {
-      return ['#2d5a87', '#5e4fa2'];
-    } else if (percent < 75) {
-      return ['#5e4fa2', '#9e4fa2'];
-    } else {
-      return ['#9e4fa2', '#d53e7e'];
-    }
+    // Gradient from blue to purple to pink (like mempool.space)
+    return ['#5e4fa2', '#b5367a'];
   }
 
   convertStyleForLoadingBlock(style) {
