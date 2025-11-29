@@ -461,7 +461,7 @@ export class DashboardComponent implements OnInit, OnDestroy, AfterViewInit {
   }
 
   getBlockFillGradient(block: BlockExtended): string {
-    // Gradient from blue to purple to pink (like mempool.space)
-    return 'linear-gradient(to right, #5e4fa2, #b5367a)';
+    // Gradient from blue to purple (like mempool.space mainnet)
+    return 'linear-gradient(to right, #5470cc, #9b59b6)';
   }
 }
