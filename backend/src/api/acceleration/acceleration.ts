@@ -2,7 +2,7 @@ import logger from '../../logger';
 import { MempoolTransactionExtended } from '../../mempool.interfaces';
 import { GraphTx, getSameBlockRelatives, initializeRelatives, makeBlockTemplate, mempoolComparator, removeAncestors, setAncestorScores } from '../mini-miner';
 
-const BLOCK_WEIGHT_UNITS = 4_000_000;
+const BLOCK_WEIGHT_UNITS = 32_000_000;
 const MAX_RELATIVE_GRAPH_SIZE = 200;
 const BID_BOOST_WINDOW = 40_000;
 const BID_BOOST_MIN_OFFSET = 10_000;
