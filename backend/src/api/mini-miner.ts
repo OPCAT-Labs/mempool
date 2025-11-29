@@ -2,7 +2,7 @@ import { Acceleration } from './acceleration/acceleration';
 import { MempoolTransactionExtended } from '../mempool.interfaces';
 import logger from '../logger';
 
-const BLOCK_WEIGHT_UNITS = 4_000_000;
+const BLOCK_WEIGHT_UNITS = 32_000_000;
 const BLOCK_SIGOPS = 80_000;
 const MAX_RELATIVE_GRAPH_SIZE = 100;
 
