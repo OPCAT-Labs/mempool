@@ -1,7 +1,7 @@
 import { Component, OnInit, OnDestroy, ChangeDetectionStrategy, ChangeDetectorRef, Input, OnChanges, SimpleChanges } from '@angular/core';
 import { Observable, Subscription, delay, filter, tap } from 'rxjs';
 import { StateService } from '@app/services/state.service';
-import { specialBlocks } from '@app/app.constants';
+import { specialBlocks, defaultMempoolFeeColors } from '@app/app.constants';
 import { BlockExtended } from '@interfaces/node-api.interface';
 import { Location } from '@angular/common';
 import { CacheService } from '@app/services/cache.service';
@@ -364,8 +364,18 @@ export class BlockchainBlocksComponent implements OnInit, OnChanges, OnDestroy {
   }
 
   getGradientByFillPercent(percent: number): [string, string] {
-    // Gradient from blue to purple (like mempool.space mainnet)
-    return ['#5470cc', '#9b59b6'];
+    const colorCount = defaultMempoolFeeColors.length;
+    const clampedPercent = Math.max(0, Math.min(100, percent));
+
+    // Linear map percentage to color index
+    const index = Math.floor((clampedPercent / 100) * (colorCount - 1));
+    const primaryIndex = Math.min(index, colorCount - 1);
+    const secondaryIndex = Math.min(index + 3, colorCount - 1);
+
+    return [
+      '#' + defaultMempoolFeeColors[primaryIndex],
+      '#' + defaultMempoolFeeColors[secondaryIndex]
+    ];
   }
 
   convertStyleForLoadingBlock(style) {
