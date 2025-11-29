@@ -340,23 +340,40 @@ export class BlockchainBlocksComponent implements OnInit, OnChanges, OnDestroy {
     } else if (block.loading) {
       return this.getStyleForLoadingBlock(index, animateEnterFrom);
     }
-    const greenBackgroundHeight = 100 - (block.size / this.stateService.env.BLOCK_WEIGHT_UNITS) * 100;
+    const fillPercent = Math.min((block.size / this.stateService.env.BLOCK_WEIGHT_UNITS) * 100, 100);
+    const greenBackgroundHeight = 100 - fillPercent;
     let addLeft = 0;
 
     if (animateEnterFrom) {
       addLeft = animateEnterFrom || 0;
     }
 
+    // Get gradient colors based on fill percentage
+    const gradientColors = this.getGradientByFillPercent(fillPercent);
+
     return {
       left: addLeft + this.blockOffset * index + 'px',
       background: `repeating-linear-gradient(
         var(--secondary),
         var(--secondary) ${greenBackgroundHeight}%,
-        ${this.gradientColors[this.network][0]} ${Math.max(greenBackgroundHeight, 0)}%,
-        ${this.gradientColors[this.network][1]} 100%
+        ${gradientColors[0]} ${Math.max(greenBackgroundHeight, 0)}%,
+        ${gradientColors[1]} 100%
       )`,
       transition: animateEnterFrom ? 'background 2s, transform 1s' : null,
     };
+  }
+
+  getGradientByFillPercent(percent: number): [string, string] {
+    // Gradient from deep blue (low) to purple/pink (high)
+    if (percent < 25) {
+      return ['#1a3a5c', '#2d5a87'];
+    } else if (percent < 50) {
+      return ['#2d5a87', '#5e4fa2'];
+    } else if (percent < 75) {
+      return ['#5e4fa2', '#9e4fa2'];
+    } else {
+      return ['#9e4fa2', '#d53e7e'];
+    }
   }
 
   convertStyleForLoadingBlock(style) {
