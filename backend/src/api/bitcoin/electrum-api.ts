@@ -8,6 +8,7 @@ import logger from '../../logger';
 import crypto from 'crypto-js';
 import loadingIndicators from '../loading-indicators';
 import memoryCache from '../memory-cache';
+import axios from 'axios';
 
 class BitcoindElectrsApi extends BitcoinApi implements AbstractBitcoinApi {
   private electrumClient: any;
@@ -298,6 +299,32 @@ class BitcoindElectrsApi extends BitcoinApi implements AbstractBitcoinApi {
       crypto.SHA256(crypto.enc.Hex.parse(scriptPubKey))
     );
     return addrScripthash!.match(/.{2}/g)!.reverse().join('');
+  }
+
+  async $getOutspends(txId: string): Promise<IEsploraApi.Outspend[]> {
+    // Try Esplora first, fallback to parent BitcoinApi method
+    if (config.ESPLORA.REST_API_URL) {
+      try {
+        const resp = await axios.get(
+          config.ESPLORA.REST_API_URL + '/tx/' + txId + '/outspends',
+          { timeout: 10000 }
+        );
+        return resp.data;
+      } catch (e) {
+        logger.warn(`Esplora outspends failed for ${txId}, falling back to BitcoinApi: ${e instanceof Error ? e.message : e}`);
+      }
+    }
+    // Fallback to parent BitcoinApi method
+    return super.$getOutspends(txId);
+  }
+
+  async $getBatchedOutspends(txIds: string[]): Promise<IEsploraApi.Outspend[][]> {
+    const outspends: IEsploraApi.Outspend[][] = [];
+    for (const txId of txIds) {
+      const outspend = await this.$getOutspends(txId);
+      outspends.push(outspend);
+    }
+    return outspends;
   }
 }
 
