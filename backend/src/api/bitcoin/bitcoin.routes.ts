@@ -108,6 +108,7 @@ class BitcoinRoutes {
       )
       .post(config.MEMPOOL.API_URL_PREFIX + 'prevouts', this.$getPrevouts)
       .post(config.MEMPOOL.API_URL_PREFIX + 'cpfp', this.getCpfpLocalTxs)
+      .post(config.MEMPOOL.API_URL_PREFIX + 'txs/bulk', this.$getTxsByIds)
       // Temporarily add txs/package endpoint for all backends until esplora supports it
       .post(config.MEMPOOL.API_URL_PREFIX + 'txs/package', this.$submitPackage)
       // Internal routes
@@ -1420,6 +1421,51 @@ class BitcoinRoutes {
       res.json(result);
     } catch (e) {
       handleError(req, res, 500, 'Failed to get prevouts');
+    }
+  }
+
+  private async $getTxsByIds(req: Request, res: Response) {
+    try {
+      const txids = req.body;
+
+      if (!Array.isArray(txids)) {
+        handleError(req, res, 400, 'Invalid txids format: expected array');
+        return;
+      }
+
+      if (txids.length > 100) {
+        handleError(req, res, 400, 'Too many txids requested (max 100)');
+        return;
+      }
+
+      if (txids.some((txid) => !TXID_REGEX.test(txid))) {
+        handleError(req, res, 400, 'Invalid txid format');
+        return;
+      }
+
+      const transactions: (TransactionExtended | null)[] = [];
+      for (const txid of txids) {
+        try {
+          const transaction = await transactionUtils.$getTransactionExtended(
+            txid,
+            true,
+            false,
+            false,
+            true
+          );
+          transactions.push(transaction);
+        } catch (e) {
+          // If a transaction is not found, add null to maintain array order
+          logger.debug(
+            `Transaction ${txid} not found: ${e instanceof Error ? e.message : e}`
+          );
+          transactions.push(null);
+        }
+      }
+
+      res.json(transactions);
+    } catch (e) {
+      handleError(req, res, 500, 'Failed to get transactions by ids');
     }
   }
 

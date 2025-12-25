@@ -46,6 +46,7 @@ import {
   getTargetUrl,
   needBaseModuleChange,
 } from '@app/shared/regex.utils';
+import { Cat20ApiService } from '@app/services/cat20-api.service';
 
 @Component({
   selector: 'app-search-form',
@@ -101,7 +102,8 @@ export class SearchFormComponent implements OnInit {
     private electrsApiService: ElectrsApiService,
     private apiService: ApiService,
     private relativeUrlPipe: RelativeUrlPipe,
-    private elementRef: ElementRef
+    private elementRef: ElementRef,
+    private cat20ApiService: Cat20ApiService
   ) {}
 
   ngOnInit(): void {
@@ -168,7 +170,7 @@ export class SearchFormComponent implements OnInit {
       debounceTime(200),
       switchMap((text) => {
         if (!text.length) {
-          return of([[], { nodes: [], channels: [] }, this.pools]);
+          return of([[], { nodes: [], channels: [] }, this.pools, []]);
         }
         this.isTypeaheading$.next(true);
         if (!this.stateService.networkSupportsLightning()) {
@@ -177,7 +179,8 @@ export class SearchFormComponent implements OnInit {
               .getAddressesByPrefix$(text)
               .pipe(catchError(() => of([]))),
             [{ nodes: [], channels: [] }],
-            this.getMiningPools()
+            this.getMiningPools(),
+            this.cat20ApiService.searchToken(text).pipe(catchError(() => of([])))
           );
         }
         return zip(
@@ -192,7 +195,8 @@ export class SearchFormComponent implements OnInit {
               })
             )
           ),
-          this.getMiningPools()
+          this.getMiningPools(),
+          this.cat20ApiService.searchToken(text).pipe(catchError(() => of([])))
         );
       }),
       map((result: any[]) => {
@@ -213,6 +217,7 @@ export class SearchFormComponent implements OnInit {
             channels: [],
           },
           this.pools,
+          [],
         ])
       ),
     ]).pipe(
@@ -233,12 +238,14 @@ export class SearchFormComponent implements OnInit {
             channels: [],
             liquidAsset: [],
             pools: [],
+            tokens: [],
           };
         }
 
         const result = latestData[1];
         const addressPrefixSearchResults = result[0];
         const lightningResults = result[1];
+        const tokens = result[3] || [];
 
         // Do not show date and timestamp results for liquid
         const isNetworkBitcoin =
@@ -310,6 +317,7 @@ export class SearchFormComponent implements OnInit {
           channels: lightningResults.channels,
           liquidAsset: liquidAsset,
           pools: pools,
+          tokens: tokens,
         };
       })
     );
@@ -346,6 +354,8 @@ export class SearchFormComponent implements OnInit {
       }
     } else if (result.slug) {
       this.navigate('/mining/pool/', result.slug);
+    } else if (result.tokenId) {
+      this.navigate('/cat20/', result.tokenId);
     }
   }
 

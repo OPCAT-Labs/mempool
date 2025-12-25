@@ -4,7 +4,7 @@ import { NgbCollapseModule, NgbTypeaheadModule } from '@ng-bootstrap/ng-bootstra
 import { FontAwesomeModule, FaIconLibrary } from '@fortawesome/angular-fontawesome';
 import { faFilter, faAngleDown, faAngleUp, faAngleRight, faAngleLeft, faBolt, faCogs, faDatabase, faExchangeAlt, faInfoCircle,
   faLink, faList, faSearch, faCaretUp, faCaretDown, faTachometerAlt, faThList, faTint, faClock, faAngleDoubleDown, faSortUp, faAngleDoubleUp, faChevronDown,
-  faFileAlt, faRedoAlt, faArrowAltCircleRight, faExternalLinkAlt, faListUl, faDownload, faQrcode, faArrowRightArrowLeft, faArrowsRotate, faCircleLeft,
+  faFileAlt, faRedoAlt, faArrowAltCircleRight, faExternalLinkAlt, faListUl, faDownload, faQrcode, faArrowRightArrowLeft, faArrowRight, faArrowsRotate, faCircleLeft,
   faFastForward, faWallet, faUserClock, faWrench, faUserFriends, faQuestionCircle, faHistory, faSignOutAlt, faKey, faSuitcase, faIdCardAlt, faNetworkWired, faUserCheck,
   faCircleCheck, faUserCircle, faCheck, faRocket, faScaleBalanced, faHourglassStart, faHourglassHalf, faHourglassEnd, faWandMagicSparkles, faTimeline,
   faCircleXmark, faCalendarCheck, faMoneyBillTrendUp, faRobot, faShareNodes, faCreditCard, faMicroscope, faExclamationTriangle, faLockOpen, faPaperclip } from '@fortawesome/free-solid-svg-icons';
@@ -128,6 +128,7 @@ import { BitcoinInvoiceComponent } from '@components/bitcoin-invoice/bitcoin-inv
 
 import { OnlyVsizeDirective, OnlyWeightDirective } from '@app/shared/components/weight-directives/weight-directives';
 import { GithubLogin } from '../components/github-login.component/github-login.component';
+import { CatOwnerAddressPipe } from '@app/shared/pipes/cat-owner-address/cat-owner-address.pipe';
 
 @NgModule({
   declarations: [
@@ -249,6 +250,7 @@ import { GithubLogin } from '../components/github-login.component/github-login.c
     TwitterLogin,
     GithubLogin,
     BitcoinInvoiceComponent,
+    CatOwnerAddressPipe,
   ],
   imports: [
     CommonModule,
@@ -386,6 +388,7 @@ import { GithubLogin } from '../components/github-login.component/github-login.c
     GithubLogin,
     BitcoinInvoiceComponent,
     BitcoinsatoshisPipe,
+    CatOwnerAddressPipe,
 
     MempoolBlockOverviewComponent,
     ClockchainComponent,
@@ -431,6 +434,7 @@ export class SharedModule {
     library.addIcons(faDownload);
     library.addIcons(faQrcode);
     library.addIcons(faArrowRightArrowLeft);
+    library.addIcons(faArrowRight);
     library.addIcons(faExchangeAlt);
     library.addIcons(faList);
     library.addIcons(faFastForward);

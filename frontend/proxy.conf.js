@@ -26,14 +26,14 @@ PROXY_CONFIG = [
         '!/liquidtestnet', '!/liquidtestnet/**', '!/liquidtestnet/',
         '/testnet/api/**', '/signet/api/**', '/testnet4/api/**'
         ],
-        target: "https://mempool.space",
+        target: "https://testnet.opcatlabs.io",
         ws: true,
         secure: false,
         changeOrigin: true
     },
     {
         context: ['/api/v1/ws'],
-        target: "https://mempool.space",
+        target: "https://testnet.opcatlabs.io",
         ws: true,
         secure: false,
         changeOrigin: true,
@@ -57,7 +57,7 @@ PROXY_CONFIG = [
     },
     {
       context: ['/resources/mining-pools/**'],
-      target: "https://mempool.space",
+      target: "https://testnet.opcatlabs.io",
       secure: false,
       changeOrigin: true
   }

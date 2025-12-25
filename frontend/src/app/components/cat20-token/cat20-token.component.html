@@ -1,0 +1,245 @@
+<div class="container-xl">
+  <div class="title-block">
+    <h1 class="mb-0">
+      <ng-container *ngIf="!isLoading && token">
+        <img *ngIf="token.iconUrl" [src]="token.iconUrl" alt="{{ token.symbol }}" class="token-icon">
+        {{ token.name }} <span class="token-symbol">({{ token.symbol }})</span>
+      </ng-container>
+      <ng-container *ngIf="isLoading">
+        Loading...
+      </ng-container>
+      <ng-container *ngIf="error">
+        Token Not Found
+      </ng-container>
+    </h1>
+  </div>
+
+  <div *ngIf="error" class="error-message">
+    <div class="alert alert-danger">
+      Unable to load token information. Please check the token ID and try again.
+    </div>
+  </div>
+
+  <div *ngIf="!isLoading && !error && token">
+    <!-- Overview, Deploy Info - Horizontal on desktop, vertical on mobile -->
+    <div class="row info-blocks">
+      <!-- Overview -->
+      <div class="col-12 col-md-6">
+        <div class="box">
+          <h2>Overview</h2>
+          <table class="table table-borderless table-striped">
+            <tbody>
+              <tr *ngIf="token.tokenScriptHash">
+                <td class="td-width-sm">Token Script Hash</td>
+                <td>
+                  <app-clipboard [text]="token.tokenScriptHash"></app-clipboard>
+                </td>
+              </tr>
+              <tr>
+                <td class="td-width-sm">Total Supply</td>
+                <td>{{ getFormattedTotalSupply() }} {{ token.symbol }}</td>
+              </tr>
+              <tr>
+                <td class="td-width-sm">Holders</td>
+                <td>{{ totalHolders | number }}</td>
+              </tr>
+              <tr>
+                <td class="td-width-sm">Transfers</td>
+                <td>{{ totalTransfers | number }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Deploy Info -->
+      <div class="col-12 col-md-6" *ngIf="token.genesisTxid || token.deployTxid || token.deployBlock || (token.metadata && getMetadataKeys().length > 0)">
+        <div class="box">
+          <h2>Deploy Info</h2>
+          <table class="table table-borderless table-striped">
+            <tbody>
+              <tr *ngIf="token.genesisTxid">
+                <td class="td-width-sm">Genesis Txid</td>
+                <td>
+                  <a [routerLink]="['/tx', token.genesisTxid]">
+                    {{ token.genesisTxid | slice:0:12 }}...
+                  </a>
+                </td>
+              </tr>
+              <tr *ngIf="token.deployTxid">
+                <td class="td-width-sm">Deploy Txid</td>
+                <td>
+                  <a [routerLink]="['/tx', token.deployTxid]">
+                    {{ token.deployTxid | slice:0:12 }}...
+                  </a>
+                </td>
+              </tr>
+              <tr *ngIf="token.deployBlock">
+                <td class="td-width-sm">Deploy Block</td>
+                <td>
+                  <a [routerLink]="['/block', token.deployBlock]">
+                    {{ token.deployBlock | number }}
+                  </a>
+                </td>
+              </tr>
+              <tr *ngIf="token.deployTime">
+                <td class="td-width-sm">Deploy Time</td>
+                <td>
+                  <app-time [time]="token.deployTime"></app-time>
+                </td>
+              </tr>
+              <tr *ngIf="token.metadata && getMetadataKeys().length > 0">
+                <td class="td-width-sm">Metadata</td>
+                <td>
+                  <a href="javascript:void(0)"
+                     class="metadata-link"
+                     [ngbPopover]="metadataContent"
+                     popoverTitle="Metadata"
+                     placement="bottom"
+                     triggers="click"
+                     container="body">
+                    View Details
+                  </a>
+
+                  <ng-template #metadataContent>
+                    <div class="metadata-popover">
+                      <table class="table table-sm table-borderless">
+                        <tbody>
+                          <tr *ngFor="let key of getMetadataKeys()">
+                            <td class="metadata-key">{{ formatMetadataKey(key) }}</td>
+                            <td class="metadata-value">{{ token.metadata[key] }}</td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    </div>
+                  </ng-template>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- Token Transfers/Holders Tabs -->
+    <div class="tabs-wrapper">
+      <button class="btn btn-sm tab-btn" [class.active]="activeTab === 'transactions'" (click)="setActiveTab('transactions')">
+        Transactions
+      </button>
+      <button class="btn btn-sm tab-btn" [class.active]="activeTab === 'holders'" (click)="setActiveTab('holders')">
+        Holders
+      </button>
+    </div>
+
+    <!-- Token Transactions -->
+    <div *ngIf="activeTab === 'transactions'">
+      <div class="title-tx">
+        <h2 class="text-left">
+          <ng-template [ngIf]="!transactions?.length">&nbsp;</ng-template>
+          <ng-template [ngIf]="transactions?.length === 1">{{ (transactions?.length | number) || '?' }} of {{ totalTransfers | number }} transaction</ng-template>
+          <ng-template [ngIf]="transactions?.length > 1">{{ (transactions?.length | number) || '?' }} of {{ totalTransfers | number }} transactions</ng-template>
+        </h2>
+      </div>
+
+      <app-transactions-list [transactions]="transactions" [showConfirmations]="true" (loadMore)="loadMoreTransactions()"></app-transactions-list>
+
+      <div class="text-center">
+        <ng-template [ngIf]="isLoadingTransactions">
+          <div class="header-bg box">
+            <div class="row" style="height: 107px;">
+              <div class="col-sm">
+                <span class="skeleton-loader"></span>
+              </div>
+              <div class="col-sm">
+                <span class="skeleton-loader"></span>
+              </div>
+            </div>
+          </div>
+        </ng-template>
+
+        <ng-template [ngIf]="!isLoadingTransactions && transactions.length === 0">
+          <div class="header-bg box" style="padding: 40px; text-align: center; color: var(--transparent-fg);">
+            <p>No transactions found for this token</p>
+          </div>
+        </ng-template>
+      </div>
+    </div>
+
+    <!-- Token Holders -->
+    <div *ngIf="activeTab === 'holders'">
+      <div class="title-tx">
+        <h2 class="text-left">
+          <ng-template [ngIf]="!holders?.length">&nbsp;</ng-template>
+          <ng-template [ngIf]="holders?.length === 1">{{ (holders?.length | number) || '?' }} of {{ totalHolders | number }} holder</ng-template>
+          <ng-template [ngIf]="holders?.length > 1">{{ (holders?.length | number) || '?' }} of {{ totalHolders | number }} holders</ng-template>
+        </h2>
+      </div>
+
+      <div class="box">
+        <div class="table-responsive">
+          <table class="table table-hover" *ngIf="holders.length > 0">
+            <thead>
+              <tr>
+                <th>Rank</th>
+                <th>Address</th>
+                <th class="text-right">Balance</th>
+                <th class="text-right">Percentage</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let holder of holders; let i = index">
+                <td>{{ i + 1 }}</td>
+                <td>
+                  <a [routerLink]="['/address', holder.address]">
+                    {{ holder.address }}
+                  </a>
+                </td>
+                <td class="text-right">{{ formatHolderBalance(holder.balance) }} {{ token.symbol }}</td>
+                <td class="text-right">{{ holder.percentage | number:'1.2-2' }}%</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="text-center" *ngIf="!fullyHoldersLoaded && holders.length > 0">
+          <button
+            class="btn btn-sm btn-primary load-more-btn"
+            (click)="loadMoreHolders()"
+            [disabled]="isLoadingHolders">
+            <span *ngIf="!isLoadingHolders">Load More</span>
+            <span *ngIf="isLoadingHolders">
+              <i class="fas fa-spinner fa-spin"></i> Loading...
+            </span>
+          </button>
+        </div>
+      </div>
+
+      <div class="text-center">
+        <ng-template [ngIf]="isLoadingHolders && holders.length === 0">
+          <div class="header-bg box">
+            <div class="row" style="height: 107px;">
+              <div class="col-sm">
+                <span class="skeleton-loader"></span>
+              </div>
+              <div class="col-sm">
+                <span class="skeleton-loader"></span>
+              </div>
+            </div>
+          </div>
+        </ng-template>
+
+        <ng-template [ngIf]="!isLoadingHolders && holders.length === 0">
+          <div class="header-bg box" style="padding: 40px; text-align: center; color: var(--transparent-fg);">
+            <p>No holders found for this token</p>
+          </div>
+        </ng-template>
+      </div>
+    </div>
+  </div>
+
+  <div *ngIf="isLoading" class="text-center">
+    <div class="spinner-border text-primary" role="status">
+      <span class="sr-only">Loading...</span>
+    </div>
+  </div>
+</div>

@@ -5,6 +5,7 @@ import {
   Observable,
   catchError,
   filter,
+  forkJoin,
   from,
   of,
   shareReplay,
@@ -23,6 +24,7 @@ import {
   Utxo,
 } from '../interfaces/electrs.interface';
 import { StateService } from '@app/services/state.service';
+import { CatService } from '@app/services/cat.service';
 import { BlockExtended } from '@interfaces/node-api.interface';
 import { calcScriptHash$ } from '@app/bitcoin.utils';
 
@@ -40,7 +42,8 @@ export class ElectrsApiService {
 
   constructor(
     private httpClient: HttpClient,
-    private stateService: StateService
+    private stateService: StateService,
+    private catService: CatService
   ) {
     this.apiBaseUrl = ''; // use relative URL by default
     if (!stateService.isBrowser) {
@@ -128,6 +131,8 @@ export class ElectrsApiService {
   getTransaction$(txId: string): Observable<Transaction> {
     return this.httpClient.get<Transaction>(
       this.apiBaseUrl + this.apiBasePath + '/api/tx/' + txId
+    ).pipe(
+      switchMap(tx => this.catService.addCatInfoToTx(tx))
     );
   }
 
@@ -174,6 +179,8 @@ export class ElectrsApiService {
         hash +
         '/txs/' +
         index
+    ).pipe(
+      switchMap(txs => txs.length > 0 ? forkJoin(txs.map(tx => this.catService.addCatInfoToTx(tx))) : of([]))
     );
   }
 
@@ -242,6 +249,8 @@ export class ElectrsApiService {
     return this.httpClient.get<Transaction[]>(
       this.apiBaseUrl + this.apiBasePath + '/api/address/' + address + '/txs',
       { params }
+    ).pipe(
+      switchMap(txs => txs.length > 0 ? forkJoin(txs.map(tx => this.catService.addCatInfoToTx(tx))) : of([]))
     );
   }
 
@@ -257,6 +266,17 @@ export class ElectrsApiService {
       this.apiBaseUrl + this.apiBasePath + '/api/addresses/txs',
       addresses,
       { params }
+    ).pipe(
+      switchMap(txs => txs.length > 0 ? forkJoin(txs.map(tx => this.catService.addCatInfoToTx(tx))) : of([]))
+    );
+  }
+
+  getTxsByIds$(txids: string[]): Observable<Transaction[]> {
+    return this.httpClient.post<Transaction[]>(
+      this.apiBaseUrl + this.apiBasePath + '/api/txs/bulk',
+      txids
+    ).pipe(
+      switchMap(txs => txs.length > 0 ? forkJoin(txs.map(tx => this.catService.addCatInfoToTx(tx))) : of([]))
     );
   }
 
@@ -311,7 +331,8 @@ export class ElectrsApiService {
             '/txs',
           { params }
         )
-      )
+      ),
+      switchMap(txs => txs.length > 0 ? forkJoin(txs.map(tx => this.catService.addCatInfoToTx(tx))) : of([]))
     );
   }
 
@@ -330,6 +351,8 @@ export class ElectrsApiService {
         scriptHash +
         '/txs',
       { params }
+    ).pipe(
+      switchMap(txs => txs.length > 0 ? forkJoin(txs.map(tx => this.catService.addCatInfoToTx(tx))) : of([]))
     );
   }
   getScriptHashesTransactions$(
@@ -349,7 +372,8 @@ export class ElectrsApiService {
           scriptHashes,
           { params }
         )
-      )
+      ),
+      switchMap(txs => txs.length > 0 ? forkJoin(txs.map(tx => this.catService.addCatInfoToTx(tx))) : of([]))
     );
   }
 
@@ -425,6 +449,8 @@ export class ElectrsApiService {
   getAssetTransactions$(assetId: string): Observable<Transaction[]> {
     return this.httpClient.get<Transaction[]>(
       this.apiBaseUrl + this.apiBasePath + '/api/asset/' + assetId + '/txs'
+    ).pipe(
+      switchMap(txs => txs.length > 0 ? forkJoin(txs.map(tx => this.catService.addCatInfoToTx(tx))) : of([]))
     );
   }
 
@@ -439,6 +465,8 @@ export class ElectrsApiService {
         assetId +
         '/txs/chain/' +
         txid
+    ).pipe(
+      switchMap(txs => txs.length > 0 ? forkJoin(txs.map(tx => this.catService.addCatInfoToTx(tx))) : of([]))
     );
   }
 

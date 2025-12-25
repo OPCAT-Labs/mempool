@@ -18,9 +18,20 @@
   <div class="clearfix"></div>
 
   <ng-template [ngIf]="!isLoadingAddress && !error">
+    <!-- Balance Type Tabs -->
+    <div class="balance-tabs-wrapper" style="margin-bottom: 10px;">
+      <button class="btn btn-sm balance-tab-btn" [class.active]="activeBalanceTab === 'btc'" (click)="setActiveBalanceTab('btc')">
+        BTC
+      </button>
+      <button class="btn btn-sm balance-tab-btn" [class.active]="activeBalanceTab === 'cat20'" (click)="setActiveBalanceTab('cat20')">
+        CAT20
+      </button>
+    </div>
+
     <div class="box">
 
-      <div class="row">
+      <!-- BTC Balance Table -->
+      <div class="row" *ngIf="activeBalanceTab === 'btc'">
         @if (isMobile) {
           <div class="col-sm">
             <table class="table table-borderless table-striped address-table">
@@ -71,6 +82,50 @@
             </table>
           </div>
         }
+      </div>
+
+      <!-- CAT20 Balances Table -->
+      <div class="row" *ngIf="activeBalanceTab === 'cat20'">
+        <div class="col-sm">
+          <div class="cat20-table-wrapper">
+            <ng-container *ngIf="isLoadingCat20Balances">
+              <div style="text-align: center; padding: 40px;">
+                <i class="fas fa-spinner fa-spin fa-2x"></i>
+                <p style="margin-top: 10px;">Loading CAT20 balances...</p>
+              </div>
+            </ng-container>
+            <ng-container *ngIf="!isLoadingCat20Balances && cat20Balances.length === 0">
+              <div style="text-align: center; padding: 40px; color: var(--transparent-fg);">
+                <p>No CAT20 tokens found for this address</p>
+              </div>
+            </ng-container>
+            <table class="table table-borderless table-striped address-table cat20-table" *ngIf="!isLoadingCat20Balances && cat20Balances.length > 0">
+              <thead>
+                <tr>
+                  <th>Token</th>
+                  <th>Balance</th>
+                  <th>Value</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr *ngFor="let token of cat20Balances">
+                  <td class="token-info">
+                    <a [routerLink]="['/cat20' | relativeUrl, token.tokenId]" class="token-link">
+                      <img [src]="token.tokenInfo.iconUrl || 'https://via.placeholder.com/32/666/FFF?text=' + token.tokenInfo.symbol"
+                           [alt]="token.tokenInfo.symbol"
+                           class="token-icon"
+                           onerror="this.src='https://via.placeholder.com/32/666/FFF?text=?'" />
+                      <span class="token-name">{{ token.tokenInfo.name }}</span>
+                      <span class="token-symbol">({{ token.tokenInfo.symbol }})</span>
+                    </a>
+                  </td>
+                  <td class="wrap-cell">{{ formatTokenBalance(token.balance, token.tokenInfo.decimals) }}</td>
+                  <td class="wrap-cell"><span class="fiat green-color">-</span></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -124,7 +179,19 @@
     </ng-container>
 
     <br>
-    <div class="title-tx">
+
+    <!-- Transaction Type Tabs -->
+    <div class="transaction-tabs-wrapper" style="margin-bottom: 10px;">
+      <button class="btn btn-sm balance-tab-btn" [class.active]="activeTransactionTab === 'all'" (click)="setActiveTransactionTab('all')">
+        Transactions
+      </button>
+      <button class="btn btn-sm balance-tab-btn" [class.active]="activeTransactionTab === 'cat20'" (click)="setActiveTransactionTab('cat20')">
+        CAT20 Transactions
+      </button>
+    </div>
+
+    <!-- Transaction Title -->
+    <div class="title-tx" *ngIf="activeTransactionTab === 'all'">
       <h2 class="text-left">
         <ng-template [ngIf]="!transactions?.length">&nbsp;</ng-template>
         <ng-template i18n="X of X Address Transaction" [ngIf]="transactions?.length === 1">{{ (transactions?.length | number) || '?' }} of {{ mempoolStats.tx_count + chainStats.tx_count | number }} transaction</ng-template>
@@ -132,37 +199,74 @@
       </h2>
     </div>
 
-    <app-transactions-list [transactions]="transactions" [showConfirmations]="true" [addresses]="[address.address]" (loadMore)="loadMore()"></app-transactions-list>
-
-    <div class="text-center">
-      <ng-template [ngIf]="isLoadingTransactions">
-
-        <ng-container *ngIf="addressLoadingStatus$ as addressLoadingStatus">
-          <div class="header-bg box" style="padding: 12px; margin-bottom: 10px;">
-            <div class="progress progress-dark">
-              <div class="progress-bar progress-light" role="progressbar" [ngStyle]="{'width': addressLoadingStatus + '%' }"></div>
-            </div>
-          </div>
-        </ng-container>
-
-        <div class="header-bg box">
-          <div class="row" style="height: 107px;">
-            <div class="col-sm">
-              <span class="skeleton-loader"></span>
-            </div>
-            <div class="col-sm">
-              <span class="skeleton-loader"></span>
-            </div>
-          </div>
-        </div>
-
-      </ng-template>
-
-      <ng-template [ngIf]="retryLoadMore">
-        <br>
-        <button type="button" class="btn btn-outline-info btn-sm" (click)="loadMore()"><fa-icon [icon]="['fas', 'redo-alt']" [fixedWidth]="true"></fa-icon></button>
-      </ng-template>
+    <div class="title-tx" *ngIf="activeTransactionTab === 'cat20'">
+      <h2 class="text-left">
+        <ng-template [ngIf]="!cat20Transactions?.length">&nbsp;</ng-template>
+        <ng-template [ngIf]="cat20Transactions?.length === 1">{{ (cat20Transactions?.length | number) || '?' }} of {{ cat20TransactionsTotal | number }} CAT20 transaction</ng-template>
+        <ng-template [ngIf]="cat20Transactions?.length > 1">{{ (cat20Transactions?.length | number) || '?' }} of {{ cat20TransactionsTotal | number }} CAT20 transactions</ng-template>
+      </h2>
     </div>
+
+    <!-- All Transactions -->
+    <ng-container *ngIf="activeTransactionTab === 'all'">
+      <app-transactions-list [transactions]="transactions" [showConfirmations]="true" [addresses]="[address.address]" (loadMore)="loadMore()"></app-transactions-list>
+
+      <div class="text-center">
+        <ng-template [ngIf]="isLoadingTransactions">
+
+          <ng-container *ngIf="addressLoadingStatus$ as addressLoadingStatus">
+            <div class="header-bg box" style="padding: 12px; margin-bottom: 10px;">
+              <div class="progress progress-dark">
+                <div class="progress-bar progress-light" role="progressbar" [ngStyle]="{'width': addressLoadingStatus + '%' }"></div>
+              </div>
+            </div>
+          </ng-container>
+
+          <div class="header-bg box">
+            <div class="row" style="height: 107px;">
+              <div class="col-sm">
+                <span class="skeleton-loader"></span>
+              </div>
+              <div class="col-sm">
+                <span class="skeleton-loader"></span>
+              </div>
+            </div>
+          </div>
+
+        </ng-template>
+
+        <ng-template [ngIf]="retryLoadMore">
+          <br>
+          <button type="button" class="btn btn-outline-info btn-sm" (click)="loadMore()"><fa-icon [icon]="['fas', 'redo-alt']" [fixedWidth]="true"></fa-icon></button>
+        </ng-template>
+      </div>
+    </ng-container>
+
+    <!-- CAT20 Transactions -->
+    <ng-container *ngIf="activeTransactionTab === 'cat20'">
+      <app-transactions-list [transactions]="cat20Transactions" [showConfirmations]="true" [addresses]="[address.address]" (loadMore)="loadMoreCat20Transactions()"></app-transactions-list>
+
+      <div class="text-center">
+        <ng-template [ngIf]="isLoadingCat20Transactions">
+          <div class="header-bg box">
+            <div class="row" style="height: 107px;">
+              <div class="col-sm">
+                <span class="skeleton-loader"></span>
+              </div>
+              <div class="col-sm">
+                <span class="skeleton-loader"></span>
+              </div>
+            </div>
+          </div>
+        </ng-template>
+
+        <ng-template [ngIf]="!isLoadingCat20Transactions && cat20Transactions.length === 0">
+          <div class="header-bg box" style="padding: 40px; text-align: center; color: var(--transparent-fg);">
+            <p>No CAT20 transactions found for this address</p>
+          </div>
+        </ng-template>
+      </div>
+    </ng-container>
 
   </ng-template>
 

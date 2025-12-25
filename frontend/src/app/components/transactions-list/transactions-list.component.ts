@@ -610,4 +610,19 @@ export class TransactionsListComponent implements OnInit, OnChanges, OnDestroy {
     this.networkSubscription.unsubscribe();
     this.signaturesSubscription.unsubscribe();
   }
+
+  formatCat20Amount(amount: string | number | undefined, decimals: number | undefined): string {
+    if (!amount || decimals === undefined) {
+      return '0';
+    }
+    const amountNum = typeof amount === 'string' ? parseFloat(amount) : amount;
+    const divisor = Math.pow(10, decimals);
+    const formattedAmount = amountNum / divisor;
+
+    // Format with appropriate decimal places, removing trailing zeros
+    return formattedAmount.toLocaleString('en-US', {
+      minimumFractionDigits: 0,
+      maximumFractionDigits: decimals
+    });
+  }
 }

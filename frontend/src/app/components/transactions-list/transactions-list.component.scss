@@ -171,6 +171,15 @@
 	}
 }
 
+// Add spacing between transaction rows
+.table-tx-vin tbody tr,
+.table-tx-vout tbody tr {
+	td {
+		padding-top: 12px;
+		padding-bottom: 12px;
+	}
+}
+
 .row{
 	flex-direction: column;
 	@media (min-width: 992px) {
@@ -334,5 +343,166 @@ h2 {
 	&.scrollable {
 		max-height: 7.5em;
 		overflow-y: auto;
+	}
+}
+
+// CAT20 Token Card Styles
+.cat20-token-card {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	padding: 8px;
+	background: color-mix(in srgb, var(--primary) 10%, transparent);
+	border-radius: 8px;
+	border: 1px solid color-mix(in srgb, var(--primary) 20%, transparent);
+	transition: all 0.2s ease;
+	margin-bottom: 8px;
+	margin-top: 8px;
+	margin-left: 25px;
+	position: relative;
+
+	&:hover {
+		background: color-mix(in srgb, var(--primary) 15%, transparent);
+		border-color: color-mix(in srgb, var(--primary) 30%, transparent);
+	}
+}
+
+.cat20-arrow-indicator {
+	position: absolute;
+	left: -25px;
+	top: 0;
+	color: var(--primary);
+	font-size: 18px;
+	opacity: 0.6;
+	transition: opacity 0.2s ease;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+
+	.cat20-token-card:hover & {
+		opacity: 1;
+	}
+}
+
+.token-icon-wrapper {
+	flex-shrink: 0;
+	width: 40px;
+	height: 40px;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+}
+
+.token-icon {
+	width: 40px;
+	height: 40px;
+	border-radius: 50%;
+	object-fit: cover;
+	border: 2px solid color-mix(in srgb, var(--primary) 30%, transparent);
+}
+
+.token-icon-placeholder {
+	width: 40px;
+	height: 40px;
+	border-radius: 50%;
+	background: linear-gradient(135deg, var(--primary) 0%, color-mix(in srgb, var(--primary) 70%, black) 100%);
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	font-weight: bold;
+	font-size: 18px;
+	color: white;
+	border: 2px solid color-mix(in srgb, var(--primary) 30%, transparent);
+}
+
+.token-info-wrapper {
+	flex: 1;
+	min-width: 0;
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+}
+
+.token-header {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	flex-wrap: wrap;
+}
+
+.token-symbol {
+	font-weight: 600;
+	font-size: 14px;
+	color: var(--primary);
+	text-decoration: none;
+	transition: color 0.2s ease;
+
+	&:hover {
+		color: color-mix(in srgb, var(--primary) 80%, white);
+		text-decoration: none;
+	}
+}
+
+.token-name {
+	font-size: 12px;
+	color: var(--transparent-fg);
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	max-width: 150px;
+
+	@media (min-width: 576px) {
+		max-width: 200px;
+	}
+}
+
+.token-tag {
+	display: inline-block;
+	padding: 2px 6px;
+	background: color-mix(in srgb, var(--primary) 20%, transparent);
+	color: var(--primary);
+	border-radius: 4px;
+	font-size: 10px;
+	font-weight: 600;
+	text-transform: uppercase;
+	letter-spacing: 0.5px;
+
+	&.minter-tag {
+		background: linear-gradient(135deg, rgba(255, 107, 53, 0.3) 0%, rgba(247, 147, 26, 0.3) 100%);
+		color: #ff6b35;
+		border: 1px solid rgba(255, 107, 53, 0.4);
+	}
+}
+
+.token-amount {
+	font-size: 13px;
+	color: var(--white);
+	font-weight: 600;
+	font-family: monospace;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+
+	@media (min-width: 576px) {
+		font-size: 14px;
+	}
+}
+
+.token-minter-badge {
+	display: inline-block;
+	padding: 4px 12px;
+	background: linear-gradient(135deg, #ff6b35 0%, #f7931a 100%);
+	color: white;
+	border-radius: 6px;
+	font-size: 11px;
+	font-weight: 700;
+	text-transform: uppercase;
+	letter-spacing: 1px;
+	box-shadow: 0 2px 4px rgba(255, 107, 53, 0.3);
+	border: 1px solid rgba(255, 255, 255, 0.2);
+
+	@media (min-width: 576px) {
+		font-size: 12px;
+		padding: 5px 14px;
 	}
 }

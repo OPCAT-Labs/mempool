@@ -122,3 +122,96 @@ h1 {
 .inactive {
   color: var(--transparent-fg);
 }
+
+.balance-tabs-wrapper {
+  display: flex;
+  gap: 10px;
+}
+
+.transaction-tabs-wrapper {
+  display: flex;
+  gap: 10px;
+}
+
+.balance-tab-btn {
+  border: 1px solid var(--transparent-fg);
+  background-color: transparent;
+  color: var(--main-text-color);
+  padding: 6px 20px;
+  font-weight: 500;
+  transition: all 0.2s ease;
+
+  &:hover {
+    background-color: var(--box-bg);
+    border-color: var(--main-text-color);
+  }
+
+  &.active {
+    background-color: var(--primary);
+    border-color: var(--primary);
+    color: #fff;
+    font-weight: 600;
+  }
+}
+
+.cat20-table-wrapper {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch; // smooth scrolling on iOS
+
+  @media (max-width: 767.98px) {
+    margin: 0 -15px; // extend to edges on mobile
+    padding: 0 15px;
+  }
+}
+
+.cat20-table {
+  table {
+    min-width: 100%;
+  }
+
+  .token-info {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    white-space: nowrap;
+  }
+
+  .token-link {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    text-decoration: none;
+    color: inherit;
+    transition: opacity 0.2s ease;
+
+    &:hover {
+      opacity: 0.8;
+      text-decoration: none;
+
+      .token-name {
+        text-decoration: underline;
+        color: var(--primary);
+      }
+    }
+  }
+
+  .token-icon {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    object-fit: cover;
+    flex-shrink: 0;
+  }
+
+  .token-name {
+    font-weight: 500;
+    color: var(--main-text-color);
+    transition: color 0.2s ease;
+  }
+
+  .token-symbol {
+    color: var(--transparent-fg);
+    font-size: 0.9em;
+    font-weight: 400;
+  }
+}

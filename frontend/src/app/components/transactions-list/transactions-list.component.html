@@ -86,6 +86,7 @@
                   </td>
                 }
                 <td class="address-cell">
+                  <!-- Original Address Display -->
                   <div [ngSwitch]="true">
                     <ng-container *ngSwitchCase="vin.is_coinbase"><span i18n="transactions-list.coinbase">Coinbase</span><ng-template [ngIf]="network !== 'liquid' && network !== 'liquidtestnet'">&nbsp;<span i18n="transactions-list.newly-generated-coins">(Newly Generated Coins)</span></ng-template><br /><a placement="bottom" [ngbTooltip]="vin.scriptsig | hex2ascii"><span class="badge badge-secondary scriptmessage longer">{{ vin.scriptsig | hex2ascii }}</span></a></ng-container>
                     <ng-container *ngSwitchCase="vin.is_pegin">
@@ -104,13 +105,21 @@
                         </ng-template>
                       </ng-template>
                       <ng-template #defaultAddress>
-                        <app-address-text
-                          *ngIf="vin.prevout.scriptpubkey_address; else vinScriptPubkeyType"
-                          [address]="vin.prevout.scriptpubkey_address"
-                          [similarity]="similarityMatches.get(tx.txid)?.get(vin.prevout.scriptpubkey_address)"
-                        ></app-address-text>
-                        <ng-template #vinScriptPubkeyType>
-                          {{ vin.prevout.scriptpubkey_type?.toUpperCase() }}
+                        <ng-container *ngIf="vin.prevout.catInfo && vin.prevout.catInfo.type === 'cat20' && vin.prevout.catInfo.tokenInfo?.cat20State?.address; else normalVinAddress">
+                          <app-address-text
+                            [address]="vin.prevout.catInfo.tokenInfo.cat20State.address | catOwnerAddress"
+                            [similarity]="similarityMatches.get(tx.txid)?.get(vin.prevout.catInfo.tokenInfo.cat20State.address | catOwnerAddress)"
+                          ></app-address-text>
+                        </ng-container>
+                        <ng-template #normalVinAddress>
+                          <app-address-text
+                            *ngIf="vin.prevout.scriptpubkey_address; else vinScriptPubkeyType"
+                            [address]="vin.prevout.scriptpubkey_address"
+                            [similarity]="similarityMatches.get(tx.txid)?.get(vin.prevout.scriptpubkey_address)"
+                          ></app-address-text>
+                          <ng-template #vinScriptPubkeyType>
+                            {{ vin.prevout.scriptpubkey_type?.toUpperCase() }}
+                          </ng-template>
                         </ng-template>
                         <div>
                           <app-address-labels  [vin]="vin" [channel]="tx._channels && tx._channels.inputs[vindex] ? tx._channels.inputs[vindex] : null"></app-address-labels>
@@ -118,20 +127,74 @@
                       </ng-template>
                     </ng-container>
                   </div>
+
+                  <!-- CAT20 Token Card (if present) -->
+                  <div *ngIf="vin.prevout && vin.prevout.catInfo" class="cat20-token-card">
+                    <div class="cat20-arrow-indicator">
+                      <fa-icon [icon]="['fas', 'arrow-right']" [fixedWidth]="true"></fa-icon>
+                    </div>
+                    <div class="token-icon-wrapper">
+                      <ng-container *ngIf="vin.prevout.catInfo.tokenInfo?.info?.iconUrl; else vinTokenPlaceholder">
+                        <img [src]="vin.prevout.catInfo.tokenInfo.info.iconUrl"
+                             [alt]="vin.prevout.catInfo.tokenInfo.info.symbol"
+                             class="token-icon"
+                             onerror="this.src='https://via.placeholder.com/32/666/FFF?text=?'">
+                      </ng-container>
+                      <ng-template #vinTokenPlaceholder>
+                        <div class="token-icon-placeholder">
+                          {{ vin.prevout.catInfo.tokenInfo?.info?.symbol?.charAt(0) || 'T' }}
+                        </div>
+                      </ng-template>
+                    </div>
+                    <div class="token-info-wrapper">
+                      <div class="token-header">
+                        <a [routerLink]="['/cat20/', vin.prevout.catInfo.tokenInfo?.info?.tokenId]" class="token-symbol">
+                          {{ vin.prevout.catInfo.tokenInfo?.info?.name }}
+                        </a>
+                        <span class="token-name">({{ vin.prevout.catInfo.tokenInfo?.info?.symbol }})</span>
+                        <span class="token-tag" [class.minter-tag]="vin.prevout.catInfo.type === 'cat20Minter'">{{ vin.prevout.catInfo.type === 'cat20Minter' ? 'MINTER' : 'CAT20' }}</span>
+                      </div>
+                      <div *ngIf="vin.prevout.catInfo.type === 'cat20' || vin.prevout.catInfo.type === 'cat20Minter'">
+                        <div *ngIf="vin.prevout.catInfo.type === 'cat20'" class="token-amount">
+                          {{ formatCat20Amount(vin.prevout.catInfo.tokenInfo?.cat20State?.amount, vin.prevout.catInfo.tokenInfo?.info?.decimals) }} {{ vin.prevout.catInfo.tokenInfo?.info?.symbol }}
+                        </div>
+                        <div *ngIf="vin.prevout.catInfo.type === 'cat20Minter'" class="token-minter-badge">
+                          MINTER
+                        </div>
+                      </div>
+                    </div>
+                  </div>
                 </td>
                 <td class="text-right nowrap amount" [class]="{large: tx.largeInput}">
                   <button *ngIf="vin.isInscription" (click)="toggleOrdData(tx.txid, 'vin', vindex)" type="button" class="btn btn-sm badge badge-ord primary" style="margin-right: 10px;">Inscription</button>
-                  <ng-template [ngIf]="vin.prevout && vin.prevout.asset && vin.prevout.asset !== nativeAssetId" [ngIfElse]="defaultOutput">
-                    <div *ngIf="assetsMinimal && assetsMinimal[vin.prevout.asset] else assetVinNotFound">
-                      <ng-container *ngTemplateOutlet="assetBox; context:{ $implicit: vin.prevout }"></ng-container>
-                    </div>
-                    <ng-template #assetVinNotFound>
-                      {{ vin.prevout.value }} <a [routerLink]="['/assets/asset/' | relativeUrl, vin.prevout.asset]">{{ vin.prevout.asset | slice : 0 : 7 }}</a>
+                  <!-- Display both CAT20 and regular amounts if catInfo exists -->
+                  <ng-template [ngIf]="vin.prevout && vin.prevout.catInfo" [ngIfElse]="nonCatInput">
+                    <!-- Show regular satoshis amount -->
+                    <ng-template [ngIf]="vin.prevout && vin.prevout.asset && vin.prevout.asset !== nativeAssetId" [ngIfElse]="catDefaultOutput">
+                      <div *ngIf="assetsMinimal && assetsMinimal[vin.prevout.asset] else assetVinNotFound">
+                        <ng-container *ngTemplateOutlet="assetBox; context:{ $implicit: vin.prevout }"></ng-container>
+                      </div>
+                      <ng-template #assetVinNotFound>
+                        {{ vin.prevout.value }} <a [routerLink]="['/assets/asset/' | relativeUrl, vin.prevout.asset]">{{ vin.prevout.asset | slice : 0 : 7 }}</a>
+                      </ng-template>
+                    </ng-template>
+                    <ng-template #catDefaultOutput>
+                      <app-amount [blockConversion]="tx.price" *ngIf="vin.prevout" [satoshis]="vin.prevout.value"></app-amount>
                     </ng-template>
                   </ng-template>
-                  <ng-template #defaultOutput>
-                    <span *ngIf="vin.lazy" class="skeleton-loader"></span>
-                    <app-amount [blockConversion]="tx.price" *ngIf="vin.prevout" [satoshis]="vin.prevout.value"></app-amount>
+                  <ng-template #nonCatInput>
+                    <ng-template [ngIf]="vin.prevout && vin.prevout.asset && vin.prevout.asset !== nativeAssetId" [ngIfElse]="defaultOutput">
+                      <div *ngIf="assetsMinimal && assetsMinimal[vin.prevout.asset] else assetVinNotFound">
+                        <ng-container *ngTemplateOutlet="assetBox; context:{ $implicit: vin.prevout }"></ng-container>
+                      </div>
+                      <ng-template #assetVinNotFound>
+                        {{ vin.prevout.value }} <a [routerLink]="['/assets/asset/' | relativeUrl, vin.prevout.asset]">{{ vin.prevout.asset | slice : 0 : 7 }}</a>
+                      </ng-template>
+                    </ng-template>
+                    <ng-template #defaultOutput>
+                      <span *ngIf="vin.lazy" class="skeleton-loader"></span>
+                      <app-amount [blockConversion]="tx.price" *ngIf="vin.prevout" [satoshis]="vin.prevout.value"></app-amount>
+                    </ng-template>
                   </ng-template>
                 </td>
               </tr>
@@ -198,17 +261,26 @@
                 'sigged': selectedSig && selectedSig.txIndex === i && sigHighlights.vout[vindex],
               }">
                 <td class="address-cell">
-                  <app-address-text
-                    *ngIf="vout.scriptpubkey_address; else pubkey_type"
-                    [address]="vout.scriptpubkey_address"
-                    [similarity]="similarityMatches.get(tx.txid)?.get(vout.scriptpubkey_address)"
-                  ></app-address-text>
-                  <ng-template #pubkey_type>
-                    <ng-container *ngIf="vout.scriptpubkey_type === 'p2pk'; else scriptpubkey_type">
-                      P2PK <a class="address p2pk-address" [routerLink]="['/address/' | relativeUrl, vout.scriptpubkey.slice(2, -2)]" title="{{ vout.scriptpubkey.slice(2, -2) }}">
-                        <app-truncate [text]="vout.scriptpubkey.slice(2, -2)" [lastChars]="8"></app-truncate>
-                      </a>
-                    </ng-container>
+                  <!-- Original Address Display -->
+                  <ng-container *ngIf="vout.catInfo && vout.catInfo.type === 'cat20' && vout.catInfo.tokenInfo?.cat20State?.address; else normalVoutAddress">
+                    <app-address-text
+                      [address]="vout.catInfo.tokenInfo.cat20State.address | catOwnerAddress"
+                      [similarity]="similarityMatches.get(tx.txid)?.get(vout.catInfo.tokenInfo.cat20State.address | catOwnerAddress)"
+                    ></app-address-text>
+                  </ng-container>
+                  <ng-template #normalVoutAddress>
+                    <app-address-text
+                      *ngIf="vout.scriptpubkey_address; else pubkey_type"
+                      [address]="vout.scriptpubkey_address"
+                      [similarity]="similarityMatches.get(tx.txid)?.get(vout.scriptpubkey_address)"
+                    ></app-address-text>
+                    <ng-template #pubkey_type>
+                      <ng-container *ngIf="vout.scriptpubkey_type === 'p2pk'; else scriptpubkey_type">
+                        P2PK <a class="address p2pk-address" [routerLink]="['/address/' | relativeUrl, vout.scriptpubkey.slice(2, -2)]" title="{{ vout.scriptpubkey.slice(2, -2) }}">
+                          <app-truncate [text]="vout.scriptpubkey.slice(2, -2)" [lastChars]="8"></app-truncate>
+                        </a>
+                      </ng-container>
+                    </ng-template>
                   </ng-template>
                   <div>
                     <app-address-labels [vout]="vout" [channel]="tx._channels && tx._channels.outputs[vindex] ? tx._channels.outputs[vindex] : null"></app-address-labels>
@@ -239,18 +311,72 @@
                       <ng-template #otherPubkeyType>{{ vout.scriptpubkey_type | scriptpubkeyType }}</ng-template>
                     </ng-template>
                   </ng-template>
+
+                  <!-- CAT20 Token Card (if present) -->
+                  <div *ngIf="vout.catInfo" class="cat20-token-card">
+                    <div class="cat20-arrow-indicator">
+                      <fa-icon [icon]="['fas', 'arrow-right']" [fixedWidth]="true"></fa-icon>
+                    </div>
+                    <div class="token-icon-wrapper">
+                      <ng-container *ngIf="vout.catInfo.tokenInfo?.info?.iconUrl; else voutTokenPlaceholder">
+                        <img [src]="vout.catInfo.tokenInfo.info.iconUrl"
+                             [alt]="vout.catInfo.tokenInfo.info.symbol"
+                             class="token-icon"
+                             onerror="this.src='https://via.placeholder.com/32/666/FFF?text=?'">
+                      </ng-container>
+                      <ng-template #voutTokenPlaceholder>
+                        <div class="token-icon-placeholder">
+                          {{ vout.catInfo.tokenInfo?.info?.symbol?.charAt(0) || 'T' }}
+                        </div>
+                      </ng-template>
+                    </div>
+                    <div class="token-info-wrapper">
+                      <div class="token-header">
+                        <a [routerLink]="['/cat20/', vout.catInfo.tokenInfo?.info?.tokenId]" class="token-symbol">
+                          {{ vout.catInfo.tokenInfo?.info?.name }}
+                        </a>
+                        <span class="token-name">({{ vout.catInfo.tokenInfo?.info?.symbol }})</span>
+                        <span class="token-tag" [class.minter-tag]="vout.catInfo.type === 'cat20Minter'">{{ vout.catInfo.type === 'cat20Minter' ? 'MINTER' : 'CAT20' }}</span>
+                      </div>
+                      <div *ngIf="vout.catInfo.type === 'cat20' || vout.catInfo.type === 'cat20Minter'">
+                        <div *ngIf="vout.catInfo.type === 'cat20'" class="token-amount">
+                          {{ formatCat20Amount(vout.catInfo.tokenInfo?.cat20State?.amount, vout.catInfo.tokenInfo?.info?.decimals) }} {{ vout.catInfo.tokenInfo?.info?.symbol }}
+                        </div>
+                        <div *ngIf="vout.catInfo.type === 'cat20Minter'" class="token-minter-badge">
+                          MINTER
+                        </div>
+                      </div>
+                    </div>
+                  </div>
                 </td>
                 <td class="text-right nowrap amount" [class]="{large: tx.largeOutput}">
-                  <ng-template [ngIf]="vout.asset && vout.asset !== nativeAssetId" [ngIfElse]="defaultOutput">
-                    <div *ngIf="assetsMinimal && assetsMinimal[vout.asset] else assetNotFound">
-                      <ng-container *ngTemplateOutlet="assetBox; context:{ $implicit: vout }"></ng-container>
-                    </div>
-                    <ng-template #assetNotFound>
-                      {{ vout.value }} <a [routerLink]="['/assets/asset/' | relativeUrl, vout.asset]">{{ vout.asset | slice : 0 : 7 }}</a>
+                  <!-- Display both CAT20 and regular amounts if catInfo exists -->
+                  <ng-template [ngIf]="vout.catInfo" [ngIfElse]="nonCatOutput">
+                    <!-- Show regular satoshis amount -->
+                    <ng-template [ngIf]="vout.asset && vout.asset !== nativeAssetId" [ngIfElse]="catDefaultOutputAmount">
+                      <div *ngIf="assetsMinimal && assetsMinimal[vout.asset] else assetNotFound">
+                        <ng-container *ngTemplateOutlet="assetBox; context:{ $implicit: vout }"></ng-container>
+                      </div>
+                      <ng-template #assetNotFound>
+                        {{ vout.value }} <a [routerLink]="['/assets/asset/' | relativeUrl, vout.asset]">{{ vout.asset | slice : 0 : 7 }}</a>
+                      </ng-template>
+                    </ng-template>
+                    <ng-template #catDefaultOutputAmount>
+                      <app-amount [blockConversion]="tx.price" [satoshis]="vout.value"></app-amount>
                     </ng-template>
                   </ng-template>
-                  <ng-template #defaultOutput>
-                    <app-amount [blockConversion]="tx.price" [satoshis]="vout.value"></app-amount>
+                  <ng-template #nonCatOutput>
+                    <ng-template [ngIf]="vout.asset && vout.asset !== nativeAssetId" [ngIfElse]="defaultOutput">
+                      <div *ngIf="assetsMinimal && assetsMinimal[vout.asset] else assetNotFound">
+                        <ng-container *ngTemplateOutlet="assetBox; context:{ $implicit: vout }"></ng-container>
+                      </div>
+                      <ng-template #assetNotFound>
+                        {{ vout.value }} <a [routerLink]="['/assets/asset/' | relativeUrl, vout.asset]">{{ vout.asset | slice : 0 : 7 }}</a>
+                      </ng-template>
+                    </ng-template>
+                    <ng-template #defaultOutput>
+                      <app-amount [blockConversion]="tx.price" [satoshis]="vout.value"></app-amount>
+                    </ng-template>
                   </ng-template>
                 </td>
                 <td class="arrow-td">
