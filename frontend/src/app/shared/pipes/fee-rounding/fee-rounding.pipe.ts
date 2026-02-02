@@ -16,6 +16,9 @@ export class FeeRoundingPipe implements PipeTransform {
 
     if (fee >= 100) {
       return formatNumber(fee, this.locale, '1.0-0')
+    } else if (fee < 0.01) {
+      // For very small fee rates (< 0.01), show up to 5 decimal places
+      return formatNumber(fee, this.locale, '1.1-5')
     } else if (fee < 10) {
       return formatNumber(fee, this.locale, '1.2-2')
     }
