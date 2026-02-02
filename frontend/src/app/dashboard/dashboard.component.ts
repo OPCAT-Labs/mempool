@@ -8,6 +8,7 @@ import { StateService } from '@app/services/state.service';
 import { WebsocketService } from '@app/services/websocket.service';
 import { SeoService } from '@app/services/seo.service';
 import { ActiveFilter, FilterMode, GradientMode, toFlags } from '@app/shared/filters.utils';
+import { defaultMempoolFeeColors } from '@app/app.constants';
 import { detectWebGL } from '@app/shared/graphs.utils';
 
 interface MempoolBlocksData {
@@ -458,5 +459,21 @@ export class DashboardComponent implements OnInit, OnDestroy, AfterViewInit {
       this.goggleResolution = 86;
       this.lbtcPegGraphHeight = 270;
     }
+  }
+
+  getBlockFillGradient(block: BlockExtended): string {
+    const percent = Math.min((block.size / this.stateService.env.BLOCK_WEIGHT_UNITS) * 100, 100);
+    const colorCount = defaultMempoolFeeColors.length;
+    const clampedPercent = Math.max(0, Math.min(100, percent));
+
+    // Linear map percentage to color index
+    const index = Math.floor((clampedPercent / 100) * (colorCount - 1));
+    const primaryIndex = Math.min(index, colorCount - 1);
+    const secondaryIndex = Math.min(index + 3, colorCount - 1);
+
+    const primaryColor = '#' + defaultMempoolFeeColors[primaryIndex];
+    const secondaryColor = '#' + defaultMempoolFeeColors[secondaryIndex];
+
+    return `linear-gradient(to right, ${primaryColor}, ${secondaryColor})`;
   }
 }
