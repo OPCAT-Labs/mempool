@@ -1297,6 +1297,20 @@ class BlocksRepository {
   private async formatDbBlockIntoExtendedBlock(
     dbBlk: DatabaseBlock
   ): Promise<BlockExtended> {
+    // Helper function to safely parse JSON with fallback
+    const safeJsonParse = (value: any, fallback: any = []): any => {
+      if (!value || value === '') {
+        return fallback;
+      }
+      try {
+        return JSON.parse(value);
+      } catch (e) {
+        const valueStr = typeof value === 'string' ? value.substring(0, 100) : String(value);
+        logger.warn(`Failed to parse JSON value: ${valueStr}`);
+        return fallback;
+      }
+    };
+
     const blk: Partial<BlockExtended> = {};
     const extras: Partial<BlockExtension> = {};
 
@@ -1318,7 +1332,7 @@ class BlocksRepository {
     // BlockExtension
     extras.totalFees = dbBlk.totalFees;
     extras.medianFee = dbBlk.medianFee;
-    extras.feeRange = JSON.parse(dbBlk.feeRange);
+    extras.feeRange = safeJsonParse(dbBlk.feeRange);
     extras.reward = dbBlk.reward;
     extras.pool = {
       id: dbBlk.poolId,
@@ -1330,9 +1344,7 @@ class BlocksRepository {
     extras.avgFeeRate = dbBlk.avgFeeRate;
     extras.coinbaseRaw = dbBlk.coinbaseRaw;
     extras.coinbaseAddress = dbBlk.coinbaseAddress;
-    extras.coinbaseAddresses = dbBlk.coinbaseAddresses
-      ? JSON.parse(dbBlk.coinbaseAddresses)
-      : [];
+    extras.coinbaseAddresses = safeJsonParse(dbBlk.coinbaseAddresses);
     extras.coinbaseSignature = dbBlk.coinbaseSignature;
     extras.coinbaseSignatureAscii = dbBlk.coinbaseSignatureAscii;
     extras.avgTxSize = dbBlk.avgTxSize;
@@ -1340,7 +1352,7 @@ class BlocksRepository {
     extras.totalOutputs = dbBlk.totalOutputs;
     extras.totalOutputAmt = dbBlk.totalOutputAmt;
     extras.medianFeeAmt = dbBlk.medianFeeAmt;
-    extras.feePercentiles = JSON.parse(dbBlk.feePercentiles);
+    extras.feePercentiles = safeJsonParse(dbBlk.feePercentiles);
     extras.segwitTotalTxs = dbBlk.segwitTotalTxs;
     extras.segwitTotalSize = dbBlk.segwitTotalSize;
     extras.segwitTotalWeight = dbBlk.segwitTotalWeight;

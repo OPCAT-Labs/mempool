@@ -7,3 +7,7 @@ frontend/src/resources/config.template.js
 frontend/src/resources/config.js
 target
 docker/backend/start_ci.sh
+node_modules
+package-lock.json
+secrets.js
+.env.prod
