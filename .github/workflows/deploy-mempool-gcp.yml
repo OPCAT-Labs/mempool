@@ -4,8 +4,6 @@ on:
   push:
     branches:
       - 'opcat-dev'
-      - 'test-*'
-      - 'fix/fee-rate-display'  # TODO: for testing only, remove after testing
   workflow_dispatch:
 
 env:
