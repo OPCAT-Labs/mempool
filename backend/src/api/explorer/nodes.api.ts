@@ -12,8 +12,8 @@ class NodesApi {
     try {
       let query = `
         SELECT nodes.public_key as publicKey, IF(nodes.alias = '', SUBSTRING(nodes.public_key, 1, 20), alias) as alias,
-        CAST(COALESCE(nodes.capacity, 0) as INT) as capacity,
-        CAST(COALESCE(nodes.channels, 0) as INT) as channels,
+        CAST(COALESCE(nodes.capacity, 0) as SIGNED) as capacity,
+        CAST(COALESCE(nodes.channels, 0) as SIGNED) as channels,
         nodes.longitude, nodes.latitude,
         geo_names_country.names as country, geo_names_iso.names as isoCode
         FROM nodes
@@ -299,8 +299,8 @@ class NodesApi {
       } else {
         query = `
           SELECT nodes.public_key AS publicKey, IF(nodes.alias = '', SUBSTRING(nodes.public_key, 1, 20), alias) as alias,
-            CAST(COALESCE(nodes.capacity, 0) as INT) as capacity,
-            CAST(COALESCE(nodes.channels, 0) as INT) as channels,
+            CAST(COALESCE(nodes.capacity, 0) as SIGNED) as capacity,
+            CAST(COALESCE(nodes.channels, 0) as SIGNED) as channels,
             UNIX_TIMESTAMP(nodes.first_seen) as firstSeen, UNIX_TIMESTAMP(nodes.updated_at) as updatedAt,
             geo_names_city.names as city, geo_names_country.names as country,
             geo_names_iso.names as iso_code, geo_names_subdivision.names as subdivision
@@ -360,8 +360,8 @@ class NodesApi {
       } else {
         query = `
           SELECT nodes.public_key AS publicKey, IF(nodes.alias = '', SUBSTRING(nodes.public_key, 1, 20), alias) as alias,
-            CAST(COALESCE(nodes.channels, 0) as INT) as channels,
-            CAST(COALESCE(nodes.capacity, 0) as INT) as capacity,
+            CAST(COALESCE(nodes.channels, 0) as SIGNED) as channels,
+            CAST(COALESCE(nodes.capacity, 0) as SIGNED) as capacity,
             UNIX_TIMESTAMP(nodes.first_seen) as firstSeen, UNIX_TIMESTAMP(nodes.updated_at) as updatedAt,
             geo_names_city.names as city, geo_names_country.names as country,
             geo_names_iso.names as iso_code, geo_names_subdivision.names as subdivision
@@ -413,8 +413,8 @@ class NodesApi {
       } else {
         query = `
           SELECT node_stats.public_key AS publicKey, IF(nodes.alias = '', SUBSTRING(node_stats.public_key, 1, 20), alias) as alias,
-            CAST(COALESCE(node_stats.channels, 0) as INT) as channels,
-            CAST(COALESCE(node_stats.capacity, 0) as INT) as capacity,
+            CAST(COALESCE(node_stats.channels, 0) as SIGNED) as channels,
+            CAST(COALESCE(node_stats.capacity, 0) as SIGNED) as capacity,
             UNIX_TIMESTAMP(nodes.first_seen) as firstSeen, UNIX_TIMESTAMP(nodes.updated_at) as updatedAt,
             geo_names_city.names as city, geo_names_country.names as country,
             geo_names_iso.names as iso_code, geo_names_subdivision.names as subdivision
@@ -596,7 +596,7 @@ class NodesApi {
   public async $getNodesPerCountry(countryId: string) {
     try {
       const query = `
-        SELECT nodes.public_key, CAST(COALESCE(nodes.capacity, 0) as INT) as capacity, CAST(COALESCE(nodes.channels, 0) as INT) as channels,
+        SELECT nodes.public_key, CAST(COALESCE(nodes.capacity, 0) as SIGNED) as capacity, CAST(COALESCE(nodes.channels, 0) as SIGNED) as channels,
           nodes.alias, UNIX_TIMESTAMP(nodes.first_seen) as first_seen, UNIX_TIMESTAMP(nodes.updated_at) as updated_at,
           geo_names_city.names as city, geo_names_country.names as country,
           geo_names_iso.names as iso_code, geo_names_subdivision.names as subdivision,
@@ -666,7 +666,7 @@ class NodesApi {
       }
 
       query = `
-        SELECT nodes.public_key, CAST(COALESCE(nodes.capacity, 0) as INT) as capacity, CAST(COALESCE(nodes.channels, 0) as INT) as channels,
+        SELECT nodes.public_key, CAST(COALESCE(nodes.capacity, 0) as SIGNED) as capacity, CAST(COALESCE(nodes.channels, 0) as SIGNED) as channels,
           nodes.alias, UNIX_TIMESTAMP(nodes.first_seen) as first_seen, UNIX_TIMESTAMP(nodes.updated_at) as updated_at,
           geo_names_city.names as city, geo_names_country.names as country,
           geo_names_iso.names as iso_code, geo_names_subdivision.names as subdivision,

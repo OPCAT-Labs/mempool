@@ -32,8 +32,8 @@ class DifficultyAdjustmentsRepository {
     interval = Common.getSqlInterval(interval);
 
     let query = `SELECT 
-      CAST(AVG(UNIX_TIMESTAMP(time)) as INT) as time,
-      CAST(AVG(height) AS INT) as height,
+      CAST(AVG(UNIX_TIMESTAMP(time)) as SIGNED) as time,
+      CAST(AVG(height) AS SIGNED) as height,
       CAST(AVG(difficulty) as DOUBLE) as difficulty,
       CAST(AVG(adjustment) as DOUBLE) as adjustment
       FROM difficulty_adjustments`;
