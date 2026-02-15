@@ -362,7 +362,8 @@ class Blocks {
       (acc, curr) => acc + curr.value,
       0
     );
-    extras.coinbaseRaw = coinbaseTx.vin[0].scriptsig;
+    // For AuxPoW (merged mining) chains, use coinbase from parent block for miner identification
+    extras.coinbaseRaw = block.auxpowCoinbase || coinbaseTx.vin[0].scriptsig;
     extras.orphans = chainTips.getOrphanedBlocksAtHeight(blk.height);
 
     if (block.height === 0) {
@@ -409,8 +410,9 @@ class Blocks {
         ),
       ];
       extras.coinbaseSignature = coinbaseTx.vout[0].scriptpubkey_asm ?? null;
+      // For AuxPoW chains, use the parent block coinbase for ASCII display
       extras.coinbaseSignatureAscii =
-        transactionUtils.hex2ascii(coinbaseTx.vin[0].scriptsig) ?? null;
+        transactionUtils.hex2ascii(block.auxpowCoinbase || coinbaseTx.vin[0].scriptsig) ?? null;
     } else {
       extras.coinbaseAddress = null;
       extras.coinbaseAddresses = null;

@@ -26,7 +26,7 @@ class BitcoinApi implements AbstractBitcoinApi {
   }
 
   static convertBlock(block: IBitcoinApi.Block): IEsploraApi.Block {
-    return {
+    const converted: IEsploraApi.Block = {
       id: block.hash,
       height: block.height,
       version: block.version,
@@ -42,6 +42,13 @@ class BitcoinApi implements AbstractBitcoinApi {
       mediantime: block.mediantime,
       stale: block.confirmations === -1,
     };
+
+    // For AuxPoW (merged mining) chains like OPCAT Layer, extract coinbase from parent block
+    if (block.auxpow?.tx?.vin?.[0]?.coinbase) {
+      converted.auxpowCoinbase = block.auxpow.tx.vin[0].coinbase;
+    }
+
+    return converted;
   }
 
   async $getRawTransaction(
