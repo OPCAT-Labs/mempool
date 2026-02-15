@@ -97,6 +97,7 @@ export namespace IEsploraApi {
     previousblockhash: string;
     mediantime: number;
     stale: boolean;
+    auxpowCoinbase?: string; // Coinbase from parent block for merged mining (AuxPoW)
   }
 
   export interface Address {

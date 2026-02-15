@@ -1,0 +1,419 @@
+name: Deploy Mempool to GCP
+
+on:
+  push:
+    branches:
+      - 'opcat-dev'
+  workflow_dispatch:
+
+env:
+  NODE_VERSION: '20'
+  # deploy configuration variables
+  GCP_PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
+  GCP_WIF_SERVICE_ACCOUNT: ${{ vars.GCP_WIF_SERVICE_ACCOUNT }}
+  GCP_WIF_PROVIDER: ${{ vars.GCP_WIF_PROVIDER }}
+  GCE_INSTANCE: ${{ vars.GCE_INSTANCE }}
+  GCE_ZONE: ${{ vars.GCE_ZONE }}
+  DEPLOY_DIR: ${{ vars.DEPLOY_DIR }}
+  DEPLOY_USER: ${{ vars.DEPLOY_USER }}
+  # Application configuration variables
+  BACKEND_PORT: ${{ vars.BACKEND_PORT }}
+  ELECTRS_API: ${{ vars.ELECTRS_API }}
+  TRACKER_API: ${{ vars.TRACKER_API }}
+  DEPLOY_HOST_NAME: ${{ vars.DEPLOY_HOST_NAME }}
+  MEMPOOL_NETWORK: ${{ vars.MEMPOOL_NETWORK }}
+  FRONTEND_PORT: ${{ vars.FRONTEND_PORT }}
+  ELECTRUM_HOST: ${{ vars.ELECTRUM_HOST }}
+  ELECTRUM_PORT: ${{ vars.ELECTRUM_PORT }}
+  ELECTRUM_TLS_ENABLED: ${{ vars.ELECTRUM_TLS_ENABLED }}
+  CORE_RPC_HOST: ${{ vars.CORE_RPC_HOST }}
+  CORE_RPC_PORT: ${{ vars.CORE_RPC_PORT }}
+  CORE_RPC_USERNAME: ${{ vars.CORE_RPC_USERNAME }}
+  DATABASE_HOST: ${{ vars.DATABASE_HOST }}
+  DATABASE_PORT: ${{ vars.DATABASE_PORT }}
+  DATABASE_NAME: ${{ vars.DATABASE_NAME }}
+  DATABASE_USERNAME: ${{ vars.DATABASE_USERNAME }}
+  DATABASE_SSL: ${{ vars.DATABASE_SSL }}
+  DATABASE_SSL_REJECT_UNAUTHORIZED: ${{ vars.DATABASE_SSL_REJECT_UNAUTHORIZED }}
+  MEMPOOL_BACKEND: ${{ vars.MEMPOOL_BACKEND }}
+  GCP_SECRET_CORE_RPC_PASSWORD: ${{ vars.GCP_SECRET_CORE_RPC_PASSWORD }}
+  GCP_SECRET_DATABASE_PASSWORD: ${{ vars.GCP_SECRET_DATABASE_PASSWORD }}
+  NODE_ENV: production
+
+jobs:
+  build:
+    name: Build Mempool
+    runs-on: ubuntu-latest
+    environment:
+      name: mainnet-prod
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Validate required GitHub Variables
+        run: |
+          echo "🔍 Validating required GitHub Variables..."
+          MISSING_VARS=()
+
+          [ -z "$BACKEND_PORT" ] && MISSING_VARS+=("BACKEND_PORT")
+          [ -z "$ELECTRS_API" ] && MISSING_VARS+=("ELECTRS_API")
+          [ -z "$TRACKER_API" ] && MISSING_VARS+=("TRACKER_API")
+          [ -z "$DEPLOY_HOST_NAME" ] && MISSING_VARS+=("DEPLOY_HOST_NAME")
+          [ -z "$MEMPOOL_NETWORK" ] && MISSING_VARS+=("MEMPOOL_NETWORK")
+          [ -z "$FRONTEND_PORT" ] && MISSING_VARS+=("FRONTEND_PORT")
+          [ -z "$ELECTRUM_HOST" ] && MISSING_VARS+=("ELECTRUM_HOST")
+          [ -z "$ELECTRUM_PORT" ] && MISSING_VARS+=("ELECTRUM_PORT")
+          [ -z "$CORE_RPC_HOST" ] && MISSING_VARS+=("CORE_RPC_HOST")
+          [ -z "$CORE_RPC_PORT" ] && MISSING_VARS+=("CORE_RPC_PORT")
+          [ -z "$CORE_RPC_USERNAME" ] && MISSING_VARS+=("CORE_RPC_USERNAME")
+          [ -z "$DATABASE_HOST" ] && MISSING_VARS+=("DATABASE_HOST")
+          [ -z "$DATABASE_PORT" ] && MISSING_VARS+=("DATABASE_PORT")
+          [ -z "$DATABASE_NAME" ] && MISSING_VARS+=("DATABASE_NAME")
+          [ -z "$DATABASE_USERNAME" ] && MISSING_VARS+=("DATABASE_USERNAME")
+          [ -z "$GCP_SECRET_CORE_RPC_PASSWORD" ] && MISSING_VARS+=("GCP_SECRET_CORE_RPC_PASSWORD")
+          [ -z "$GCP_SECRET_DATABASE_PASSWORD" ] && MISSING_VARS+=("GCP_SECRET_DATABASE_PASSWORD")
+
+          if [ ${#MISSING_VARS[@]} -gt 0 ]; then
+            echo "❌ Missing required GitHub Variables:"
+            printf '  - %s\n' "${MISSING_VARS[@]}"
+            echo ""
+            echo "Please set these variables in your repository settings:"
+            echo "Settings → Secrets and variables → Actions → Variables"
+            exit 1
+          fi
+
+          echo "✅ All required GitHub Variables are set"
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Set commit hash
+        run: echo "MEMPOOL_COMMIT_HASH=$(git rev-parse --short HEAD)" >> $GITHUB_ENV
+
+      # Build Backend
+      - name: Install backend dependencies
+        working-directory: backend
+        run: npm ci
+
+      - name: Build backend
+        working-directory: backend
+        run: npm run build
+        env:
+          NODE_ENV: production
+          MEMPOOL_COMMIT_HASH: ${{ env.MEMPOOL_COMMIT_HASH }}
+
+      # Build Frontend
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Generate frontend config
+        working-directory: frontend
+        run: |
+          cat > mempool-frontend-config.json << EOF
+          {
+            "TESTNET_ENABLED": false,
+            "TESTNET4_ENABLED": false,
+            "SIGNET_ENABLED": false,
+            "LIQUID_ENABLED": false,
+            "LIQUID_TESTNET_ENABLED": false,
+            "MAINNET_ENABLED": false,
+            "ITEMS_PER_PAGE": 10,
+            "KEEP_BLOCKS_AMOUNT": 8,
+            "NGINX_PROTOCOL": "http",
+            "NGINX_HOSTNAME": "127.0.0.1",
+            "NGINX_PORT": "80",
+            "BLOCK_WEIGHT_UNITS": 4000000,
+            "MEMPOOL_BLOCKS_AMOUNT": 8,
+            "BASE_MODULE": "mempool",
+            "ROOT_NETWORK": "${MEMPOOL_NETWORK:-testnet}",
+            "MEMPOOL_WEBSITE_URL": "https://mempool.space",
+            "LIQUID_WEBSITE_URL": "https://liquid.network",
+            "MINING_DASHBOARD": true,
+            "AUDIT": false,
+            "MAINNET_BLOCK_AUDIT_START_HEIGHT": 0,
+            "TESTNET_BLOCK_AUDIT_START_HEIGHT": 0,
+            "SIGNET_BLOCK_AUDIT_START_HEIGHT": 0,
+            "LIGHTNING": false,
+            "HISTORICAL_PRICE": true,
+            "ADDITIONAL_CURRENCIES": false,
+            "ACCELERATOR": false,
+            "ACCELERATOR_BUTTON": true,
+            "PUBLIC_ACCELERATIONS": false,
+            "STRATUM_ENABLED": false,
+            "SERVICES_API": "https://${DEPLOY_HOST_NAME}/api/v1/services"
+          }
+          EOF
+          echo "✅ Generated mempool-frontend-config.json"
+
+      - name: Build frontend
+        working-directory: frontend
+        run: npm run build 2>&1 | grep -v "Generating localized bundles" || true
+        env:
+          NODE_ENV: production
+
+      - name: Create deployment package
+        run: |
+          echo "🔧 Creating deployment package..."
+          mkdir -p deploy
+
+          # Copy backend
+          echo "📦 Packaging backend..."
+          mkdir -p deploy/backend
+          cp -r backend/dist deploy/backend/
+          cp backend/package*.json deploy/backend/
+          cp -r backend/src deploy/backend/
+          cp -r backend/rust-gbt deploy/backend/ 2>/dev/null || echo "⚠️ rust-gbt not found, will be built on server"
+          # mempool-config.json will be created on the server
+
+          # Copy frontend
+          echo "📦 Packaging frontend..."
+          mkdir -p deploy/frontend
+          cp -r frontend/dist deploy/frontend/
+          cp frontend/package*.json deploy/frontend/
+          cp frontend/server-simple.js deploy/frontend/
+
+          # Copy PM2 ecosystem config and dependencies
+          cp ecosystem.prod.config.js deploy/
+          cp package.json deploy/
+
+          # Create deployment archive
+          tar -czf deployment.tar.gz -C deploy .
+          echo "✅ Deployment package created: $(du -h deployment.tar.gz)"
+
+      - name: Verify deployment package
+        run: |
+          echo "📦 Verifying deployment package:"
+          if [ ! -f "deployment.tar.gz" ]; then
+            echo "❌ deployment.tar.gz was not created!"
+            exit 1
+          fi
+          echo "📋 Package contents:"
+          tar -tzf deployment.tar.gz | head -20
+          echo "..."
+          echo "Total files: $(tar -tzf deployment.tar.gz | wc -l)"
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: mempool-deployment
+          path: deployment.tar.gz
+          retention-days: 7
+
+  deploy:
+    name: Deploy to GCP
+    needs: build
+    runs-on: ubuntu-latest
+    if: ${{ needs.build.result == 'success' }}
+    environment:
+      name: mainnet-prod
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: mempool-deployment
+          path: ./artifacts
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          project_id: ${{ env.GCP_PROJECT_ID }}
+          workload_identity_provider: ${{ env.GCP_WIF_PROVIDER }}
+          service_account: ${{ env.GCP_WIF_SERVICE_ACCOUNT }}
+
+      - name: Setup Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Install NumPy for IAP tunnel performance
+        run: |
+          GCLOUD_PYTHON=$(gcloud info --format='value(basic.python_location)')
+          $GCLOUD_PYTHON -m pip install numpy --quiet 2>/dev/null || pip3 install numpy --quiet || true
+
+      - name: Upload deployment package to VM
+        run: |
+          echo "📤 Uploading deployment package to VM..."
+          gcloud compute scp ./artifacts/deployment.tar.gz \
+            ${GCE_INSTANCE}:/tmp/ \
+            --zone=${GCE_ZONE} \
+            --tunnel-through-iap
+          echo "✅ Upload complete"
+
+      - name: Create env file content
+        id: env_content
+        run: |
+          cat > /tmp/env.prod << EOF
+
+          # backend env, used by generateMempoolConfig ecosystem.prod.config.js:24
+          MEMPOOL_NETWORK=${MEMPOOL_NETWORK}
+          MEMPOOL_HTTP_PORT=${BACKEND_PORT}
+          MEMPOOL_BACKEND=${MEMPOOL_BACKEND}
+          DATABASE_HOST=${DATABASE_HOST}
+          DATABASE_PORT=${DATABASE_PORT}
+          DATABASE_NAME=${DATABASE_NAME}
+          DATABASE_USERNAME=${DATABASE_USERNAME}
+          DATABASE_SSL=${DATABASE_SSL}
+          DATABASE_SSL_REJECT_UNAUTHORIZED=${DATABASE_SSL_REJECT_UNAUTHORIZED}
+          ELECTRUM_HOST=${ELECTRUM_HOST}
+          ELECTRUM_PORT=${ELECTRUM_PORT}
+          ELECTRUM_TLS_ENABLED=${ELECTRUM_TLS_ENABLED}
+          CORE_RPC_HOST=${CORE_RPC_HOST}
+          CORE_RPC_PORT=${CORE_RPC_PORT}
+          CORE_RPC_USERNAME=${CORE_RPC_USERNAME}
+
+          # frontend env, used by server-simple.js ecosystem.prod.config.js:212
+          FRONTEND_PORT=${FRONTEND_PORT}
+          BACKEND_API=http://127.0.0.1:${BACKEND_PORT}
+          ELECTRS_API=${ELECTRS_API}
+          TRACKER_API=${TRACKER_API}
+          NODE_ENV=${NODE_ENV}
+          EOF
+          echo "ENV_B64=$(base64 -w0 /tmp/env.prod)" >> $GITHUB_OUTPUT
+
+      - name: Upload env file to VM
+        run: |
+          echo "${{ steps.env_content.outputs.ENV_B64 }}" | base64 -d > /tmp/env.prod
+          gcloud compute scp /tmp/env.prod ${GCE_INSTANCE}:/tmp/env.prod --zone=${GCE_ZONE} --tunnel-through-iap
+
+      - name: Checkout internal actions
+        uses: actions/checkout@v4
+        with:
+          repository: OPCAT-Labs/internal
+          path: .github/actions/internal
+          token: ${{ secrets.INTERNAL_REPO_TOKEN }}
+
+      - name: Generate fetch-secrets script
+        uses: ./.github/actions/internal/fetch-secrets
+        with:
+          vars_json: ${{ toJSON(vars) }}
+          output_path: /tmp/fetch-secrets.sh
+
+      - name: Upload fetch-secrets script to VM
+        run: |
+          gcloud compute scp /tmp/fetch-secrets.sh ${GCE_INSTANCE}:/tmp/fetch-secrets.sh --zone=${GCE_ZONE} --tunnel-through-iap
+
+      - name: Deploy to server
+        run: |
+          echo "📂 Ensuring deploy directory exists..."
+          gcloud compute ssh ${GCE_INSTANCE} --zone=${GCE_ZONE} --tunnel-through-iap --command "
+            sudo mkdir -p ${DEPLOY_DIR} &&
+            sudo mkdir -p ${DEPLOY_DIR}/logs &&
+            sudo chown -R ${DEPLOY_USER}:${DEPLOY_USER} ${DEPLOY_DIR}
+          "
+
+          echo "📂 Moving deployment files..."
+          gcloud compute ssh ${GCE_INSTANCE} --zone=${GCE_ZONE} --tunnel-through-iap --command "
+            set -euo pipefail &&
+            sudo mv /tmp/deployment.tar.gz ${DEPLOY_DIR}/ &&
+            sudo mv /tmp/env.prod ${DEPLOY_DIR}/.env.prod &&
+            sudo mv /tmp/fetch-secrets.sh ${DEPLOY_DIR}/fetch-secrets.sh &&
+            sudo chown -R ${DEPLOY_USER}:${DEPLOY_USER} ${DEPLOY_DIR} &&
+            sudo chmod 700 ${DEPLOY_DIR}/fetch-secrets.sh
+          "
+
+          echo "🛑 Stopping current services..."
+          gcloud compute ssh ${GCE_INSTANCE} --zone=${GCE_ZONE} --tunnel-through-iap --command "
+            sudo su - ${DEPLOY_USER} -c '
+              source ~/.nvm/nvm.sh &&
+              pm2 stop mempool-backend 2>/dev/null && echo ✅ Backend stopped || echo ⏭️ No backend to stop
+            '
+          "
+          gcloud compute ssh ${GCE_INSTANCE} --zone=${GCE_ZONE} --tunnel-through-iap --command "
+            sudo su - ${DEPLOY_USER} -c '
+              source ~/.nvm/nvm.sh &&
+              pm2 stop mempool-frontend 2>/dev/null && echo ✅ Frontend stopped || echo ⏭️ No frontend to stop
+            '
+          "
+
+          echo "📦 Extracting deployment package..."
+          gcloud compute ssh ${GCE_INSTANCE} --zone=${GCE_ZONE} --tunnel-through-iap --command "
+            sudo su - ${DEPLOY_USER} -c '
+              cd ${DEPLOY_DIR} &&
+              tar -xzf deployment.tar.gz &&
+              rm -f deployment.tar.gz
+            '
+          "
+
+          echo "📥 Installing backend dependencies..."
+          gcloud compute ssh ${GCE_INSTANCE} --zone=${GCE_ZONE} --tunnel-through-iap --command "
+            sudo su - ${DEPLOY_USER} -c '
+              source ~/.nvm/nvm.sh &&
+              cd ${DEPLOY_DIR}/backend &&
+              npm ci --omit=dev --ignore-scripts
+            '
+          "
+
+          echo "📥 Installing frontend dependencies..."
+          gcloud compute ssh ${GCE_INSTANCE} --zone=${GCE_ZONE} --tunnel-through-iap --command "
+            sudo su - ${DEPLOY_USER} -c '
+              source ~/.nvm/nvm.sh &&
+              cd ${DEPLOY_DIR}/frontend &&
+              npm ci --omit=dev --ignore-scripts
+            '
+          "
+
+          echo "📥 Installing root dependencies (dotenv for PM2)..."
+          gcloud compute ssh ${GCE_INSTANCE} --zone=${GCE_ZONE} --tunnel-through-iap --command "
+            sudo su - ${DEPLOY_USER} -c '
+              source ~/.nvm/nvm.sh &&
+              cd ${DEPLOY_DIR} &&
+              npm install
+            '
+          "
+
+          echo "🔐 Fetching secrets from GCP..."
+          gcloud compute ssh ${GCE_INSTANCE} --zone=${GCE_ZONE} --tunnel-through-iap --command "
+            sudo su - ${DEPLOY_USER} -c '
+              source ~/.nvm/nvm.sh &&
+              cd ${DEPLOY_DIR} &&
+              ./fetch-secrets.sh
+            '
+          "
+
+          echo "🚀 Starting services with PM2..."
+          gcloud compute ssh ${GCE_INSTANCE} --zone=${GCE_ZONE} --tunnel-through-iap --command "
+            sudo su - ${DEPLOY_USER} -c '
+              source ~/.nvm/nvm.sh &&
+              cd ${DEPLOY_DIR} &&
+              pm2 start ecosystem.prod.config.js &&
+              pm2 save
+            '
+          "
+
+          echo "📋 Checking PM2 status..."
+          gcloud compute ssh ${GCE_INSTANCE} --zone=${GCE_ZONE} --tunnel-through-iap --command "
+            sleep 10 &&
+            sudo su - ${DEPLOY_USER} -c '
+              source ~/.nvm/nvm.sh &&
+              pm2 list
+            '
+          "
+
+          echo "🎉 Deployment completed!"
+
+      - name: Health check
+        run: |
+          echo "🔍 Running health checks..."
+
+          echo "Checking backend API..."
+          gcloud compute ssh ${GCE_INSTANCE} --zone=${GCE_ZONE} --tunnel-through-iap --command "
+            sleep 5 &&
+            curl -sf http://localhost:${BACKEND_PORT}/api/v1/blocks/tip/height > /dev/null &&
+            echo '✅ Backend health check passed!' ||
+            (echo '❌ Backend health check failed' && sudo su - ${DEPLOY_USER} -c 'source ~/.nvm/nvm.sh && pm2 logs mempool-backend --lines 20 --nostream' && exit 1)
+          "
+
+          echo "Checking frontend..."
+          gcloud compute ssh ${GCE_INSTANCE} --zone=${GCE_ZONE} --tunnel-through-iap --command "
+            sleep 3 &&
+            curl -sf http://localhost:${FRONTEND_PORT}/api/v1/blocks/tip/height/ > /dev/null &&
+            echo '✅ Frontend health check passed!' ||
+            (echo '❌ Frontend health check failed' && sudo su - ${DEPLOY_USER} -c 'source ~/.nvm/nvm.sh && pm2 logs mempool-frontend --lines 20 --nostream' && exit 1)
+          "
+
+          echo "✅ All health checks passed!"

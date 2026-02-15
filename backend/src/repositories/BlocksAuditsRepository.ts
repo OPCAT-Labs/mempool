@@ -3,6 +3,14 @@ import logger from '../logger';
 import bitcoinApi from '../api/bitcoin/bitcoin-api-factory';
 import { BlockAudit, AuditScore, TransactionAudit, TransactionStripped } from '../mempool.interfaces';
 
+// Helper to safely parse JSON that might already be an object (MySQL 8.0 JSON columns)
+function safeJsonParse(value: any): any {
+  if (typeof value === 'string') {
+    return JSON.parse(value);
+  }
+  return value;
+}
+
 interface MigrationAudit {
   version: number,
   height: number,
@@ -96,15 +104,15 @@ class BlocksAuditRepositories {
       `, [hash]);
       
       if (rows.length) {
-        rows[0].unseenTxs = JSON.parse(rows[0].unseenTxs);
-        rows[0].missingTxs = JSON.parse(rows[0].missingTxs);
-        rows[0].addedTxs = JSON.parse(rows[0].addedTxs);
-        rows[0].prioritizedTxs = JSON.parse(rows[0].prioritizedTxs);
-        rows[0].freshTxs = JSON.parse(rows[0].freshTxs);
-        rows[0].sigopTxs = JSON.parse(rows[0].sigopTxs);
-        rows[0].fullrbfTxs = JSON.parse(rows[0].fullrbfTxs);
-        rows[0].acceleratedTxs = JSON.parse(rows[0].acceleratedTxs);
-        rows[0].template = JSON.parse(rows[0].template);
+        rows[0].unseenTxs = safeJsonParse(rows[0].unseenTxs);
+        rows[0].missingTxs = safeJsonParse(rows[0].missingTxs);
+        rows[0].addedTxs = safeJsonParse(rows[0].addedTxs);
+        rows[0].prioritizedTxs = safeJsonParse(rows[0].prioritizedTxs);
+        rows[0].freshTxs = safeJsonParse(rows[0].freshTxs);
+        rows[0].sigopTxs = safeJsonParse(rows[0].sigopTxs);
+        rows[0].fullrbfTxs = safeJsonParse(rows[0].fullrbfTxs);
+        rows[0].acceleratedTxs = safeJsonParse(rows[0].acceleratedTxs);
+        rows[0].template = safeJsonParse(rows[0].template);
 
         return rows[0];
       }

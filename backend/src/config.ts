@@ -108,6 +108,8 @@ interface IConfig {
     TIMEOUT: number;
     PID_DIR: string;
     POOL_SIZE: number;
+    SSL: boolean;
+    SSL_REJECT_UNAUTHORIZED: boolean;
   };
   SYSLOG: {
     ENABLED: boolean;
@@ -260,6 +262,8 @@ const defaults: IConfig = {
     'TIMEOUT': 180000,
     'PID_DIR': '',
     'POOL_SIZE': 100,
+    'SSL': false,
+    'SSL_REJECT_UNAUTHORIZED': true,
   },
   'SYSLOG': {
     'ENABLED': true,

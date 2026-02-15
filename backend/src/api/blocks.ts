@@ -342,6 +342,22 @@ class Blocks {
   }
 
   /**
+   * Fetch AuxPoW coinbase from Bitcoin RPC for merged mining chains
+   * This is needed when using Esplora/Electrum backend which doesn't include auxpow data
+   */
+  private async $getAuxPowCoinbase(blockHash: string): Promise<string | undefined> {
+    try {
+      const rpcBlock = await bitcoinClient.getBlock(blockHash);
+      if (rpcBlock?.auxpow?.tx?.vin?.[0]?.coinbase) {
+        return rpcBlock.auxpow.tx.vin[0].coinbase;
+      }
+    } catch (e) {
+      // AuxPoW not available or RPC error - fall back to regular coinbase
+    }
+    return undefined;
+  }
+
+  /**
    * Return a block with additional data (reward, coinbase, fees...)
    * @param block
    * @param transactions
@@ -362,7 +378,14 @@ class Blocks {
       (acc, curr) => acc + curr.value,
       0
     );
-    extras.coinbaseRaw = coinbaseTx.vin[0].scriptsig;
+
+    // For AuxPoW (merged mining) chains, use coinbase from parent block for miner identification
+    // If not already present (Esplora/Electrum backend), fetch from RPC
+    let auxpowCoinbase = block.auxpowCoinbase;
+    if (!auxpowCoinbase && config.MEMPOOL.BACKEND !== 'none') {
+      auxpowCoinbase = await this.$getAuxPowCoinbase(block.id);
+    }
+    extras.coinbaseRaw = auxpowCoinbase || coinbaseTx.vin[0].scriptsig;
     extras.orphans = chainTips.getOrphanedBlocksAtHeight(blk.height);
 
     if (block.height === 0) {
@@ -409,8 +432,9 @@ class Blocks {
         ),
       ];
       extras.coinbaseSignature = coinbaseTx.vout[0].scriptpubkey_asm ?? null;
+      // For AuxPoW chains, use the parent block coinbase for ASCII display
       extras.coinbaseSignatureAscii =
-        transactionUtils.hex2ascii(coinbaseTx.vin[0].scriptsig) ?? null;
+        transactionUtils.hex2ascii(auxpowCoinbase || coinbaseTx.vin[0].scriptsig) ?? null;
     } else {
       extras.coinbaseAddress = null;
       extras.coinbaseAddresses = null;
