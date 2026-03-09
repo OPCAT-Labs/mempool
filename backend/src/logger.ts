@@ -1,4 +1,3 @@
-const __deliberate_ci_error: numbre = 42;
 import config from './config';
 import * as dgram from 'dgram';
 
