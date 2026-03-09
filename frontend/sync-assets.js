@@ -122,6 +122,9 @@ function downloadMiningPoolLogos$() {
           }
           let downloadedCount = 0;
           for (const poolLogo of poolLogos) {
+            if (!poolLogo.download_url) {
+              continue;
+            }
             if (verbose) {
               console.log(`${LOG_TAG} Processing ${poolLogo.name}`);
             }
