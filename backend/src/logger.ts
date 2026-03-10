@@ -1,3 +1,4 @@
+import { BrokenImportTYPO } from './broken-import-typo';
 import config from './config';
 import * as dgram from 'dgram';
 
