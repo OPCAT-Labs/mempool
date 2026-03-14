@@ -3,12 +3,20 @@ import DB from '../database';
 import logger from '../logger';
 import { BlockSummary, TransactionClassified } from '../mempool.interfaces';
 
+// Helper to safely parse JSON that might already be an object (MySQL 8.0 JSON columns)
+function safeJsonParse(value: any): any {
+  if (typeof value === 'string') {
+    return JSON.parse(value);
+  }
+  return value;
+}
+
 class BlocksSummariesRepository {
   public async $getByBlockId(id: string): Promise<BlockSummary | undefined> {
     try {
       const [summary]: any[] = await DB.query(`SELECT * from blocks_summaries WHERE id = ?`, [id]);
       if (summary.length > 0) {
-        summary[0].transactions = JSON.parse(summary[0].transactions);
+        summary[0].transactions = safeJsonParse(summary[0].transactions);
         return summary[0];
       }
     } catch (e) {
@@ -58,7 +66,7 @@ class BlocksSummariesRepository {
       if (templates.length > 0) {
         return {
           id: templates[0].id,
-          transactions: JSON.parse(templates[0].template),
+          transactions: safeJsonParse(templates[0].template),
           version: templates[0].version,
         };
       }
@@ -168,7 +176,7 @@ class BlocksSummariesRepository {
         return null;
       }
 
-      const transactions = JSON.parse(rows[0].transactions);
+      const transactions = safeJsonParse(rows[0].transactions);
       if (transactions === null) {
         return null;
       }

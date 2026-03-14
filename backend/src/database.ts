@@ -13,6 +13,11 @@ import { execSync } from 'child_process';
     } else {
       this.poolConfig.host = config.DATABASE.HOST;
     }
+    if (config.DATABASE.SSL) {
+      this.poolConfig.ssl = {
+        rejectUnauthorized: config.DATABASE.SSL_REJECT_UNAUTHORIZED
+      };
+    }
   }
   private pool: Pool | null = null;
   private poolConfig: PoolOptions = {
@@ -171,6 +176,9 @@ import { execSync } from 'child_process';
       this.pool = createPool(this.poolConfig);
       this.pool.on('connection', function (newConnection: PoolConnection) {
         newConnection.query(`SET time_zone='+00:00'`);
+        // Disable strict mode to allow JSON/TEXT/BLOB columns to have default values
+        // MySQL 8.0 strict mode doesn't allow this, but we need it for migrations
+        newConnection.query(`SET sql_mode=''`);
       });
     }
     return this.pool;

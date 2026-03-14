@@ -55,24 +55,41 @@ export function calcBitsDifference(oldBits: number, newBits: number): number {
   const newExp = newBits >> 24;
   const oldNum = oldBits & 0x007fffff;
   const newNum = newBits & 0x007fffff;
-  // The diff can only possibly be 1, 0, -1
-  // (because maximum difficulty change is x4 or /4 (2 bits up or down))
+
+  // Calculate the actual target values for comparison
+  // Target = num * 2^(8*(exp-3))
+  // We use BigInt to avoid precision loss with large numbers
+  const expDiff = newExp - oldExp;
   let result: number;
-  switch (newExp - oldExp) {
-    // New less than old, target lowered, difficulty increased
-    case -1:
-      result = ((oldNum << 8) * 100) / newNum - 100;
-      break;
-    // Same exponent, compare numbers as is.
-    case 0:
-      result = (oldNum * 100) / newNum - 100;
-      break;
-    // Old less than new, target raised, difficulty decreased
-    case 1:
-      result = (oldNum * 100) / (newNum << 8) - 100;
-      break;
-    default:
-      throw new Error('Impossible exponent difference');
+
+  if (expDiff >= -1 && expDiff <= 1) {
+    // Original Bitcoin logic for small differences (x4 or /4 max)
+    switch (expDiff) {
+      // New less than old, target lowered, difficulty increased
+      case -1:
+        result = ((oldNum << 8) * 100) / newNum - 100;
+        break;
+      // Same exponent, compare numbers as is.
+      case 0:
+        result = (oldNum * 100) / newNum - 100;
+        break;
+      // Old less than new, target raised, difficulty decreased
+      case 1:
+        result = (oldNum * 100) / (newNum << 8) - 100;
+        break;
+      default:
+        result = 0; // Should never reach here
+    }
+  } else {
+    // Handle larger exponent differences (for non-standard chains like OPCAT)
+    // Calculate ratio using BigInt for precision
+    const oldTarget = BigInt(oldNum) * (BigInt(1) << BigInt(8 * oldExp));
+    const newTarget = BigInt(newNum) * (BigInt(1) << BigInt(8 * newExp));
+
+    // difficulty = old_target / new_target - 1 (as percentage)
+    // If new target is smaller, difficulty increased (positive result)
+    // If new target is larger, difficulty decreased (negative result)
+    result = Number((oldTarget * BigInt(100)) / newTarget) - 100;
   }
 
   // Min/Max values

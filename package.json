@@ -1,0 +1,9 @@
+{
+  "name": "mempool-deployment",
+  "version": "1.0.0",
+  "description": "Mempool deployment package",
+  "private": true,
+  "dependencies": {
+    "dotenv": "^16.0.0"
+  }
+}

@@ -5,6 +5,14 @@ import DB from '../database';
 import logger from '../logger';
 import { PoolInfo, PoolTag } from '../mempool.interfaces';
 
+// Helper to safely parse JSON that might already be an object (MySQL 8.0 JSON columns)
+function safeJsonParse(value: any): any {
+  if (typeof value === 'string') {
+    return JSON.parse(value);
+  }
+  return value;
+}
+
 class PoolsRepository {
   /**
    * Get all pools tagging info
@@ -98,12 +106,12 @@ class PoolsRepository {
       }
 
       if (parse) {
-        rows[0].regexes = JSON.parse(rows[0].regexes);
+        rows[0].regexes = safeJsonParse(rows[0].regexes);
       }
       if (['testnet', 'signet'].includes(config.MEMPOOL.NETWORK)) {
         rows[0].addresses = []; // pools-v2.json only contains mainnet addresses
       } else if (parse) {
-        rows[0].addresses = JSON.parse(rows[0].addresses);
+        rows[0].addresses = safeJsonParse(rows[0].addresses);
       }
 
       return rows[0];
@@ -130,12 +138,12 @@ class PoolsRepository {
       }
 
       if (parse) {
-        rows[0].regexes = JSON.parse(rows[0].regexes);
+        rows[0].regexes = safeJsonParse(rows[0].regexes);
       }
       if (['testnet', 'signet'].includes(config.MEMPOOL.NETWORK)) {
         rows[0].addresses = []; // pools.json only contains mainnet addresses
       } else if (parse) {
-        rows[0].addresses = JSON.parse(rows[0].addresses);
+        rows[0].addresses = safeJsonParse(rows[0].addresses);
       }
 
       return rows[0];

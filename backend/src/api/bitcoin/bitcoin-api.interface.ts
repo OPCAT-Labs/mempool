@@ -35,6 +35,39 @@ export namespace IBitcoinApi {
     'bip125-replaceable': boolean; //  (boolean) Whether this transaction could be replaced due to BIP125 (replace-by-fee)
   }
 
+  // AuxPoW (Auxiliary Proof of Work) for merged mining chains like OPCAT Layer
+  export interface AuxPowTransaction {
+    vin: Array<{
+      coinbase?: string;
+      txinwitness?: string[];
+      sequence?: number;
+    }>;
+    vout: Array<{
+      value: number;
+      n: number;
+      scriptPubKey: {
+        addresses?: string[];
+        address?: string;
+      };
+    }>;
+  }
+
+  export interface AuxPow {
+    tx: AuxPowTransaction;
+    chainindex: number;
+    merklebranch: string[];
+    chainmerklebranch: string[];
+    parentblock: {
+      hash: string;
+      version: number;
+      merkleroot: string;
+      time: number;
+      nonce: number;
+      bits: string;
+      difficulty: number;
+    };
+  }
+
   export interface Block {
     hash: string; //  (string) the block hash (same as provided)
     confirmations: number; //  (numeric) The number of confirmations, or -1 if the block is not on the main chain
@@ -55,6 +88,7 @@ export namespace IBitcoinApi {
     nTx: number; //  (numeric) The number of transactions in the block
     previousblockhash: string; //  (string) The hash of the previous block
     nextblockhash: string; //  (string) The hash of the next block
+    auxpow?: AuxPow; //  (object) AuxPoW data for merged mining chains
   }
 
   export interface Transaction {
