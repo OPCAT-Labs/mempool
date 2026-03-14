@@ -84,7 +84,9 @@
     "PASSWORD": "__DATABASE_PASSWORD__",
     "PID_DIR": "__DATABASE_PID_FILE__",
     "TIMEOUT": 3000,
-    "POOL_SIZE": 100
+    "POOL_SIZE": 100,
+    "SSL": false,
+    "SSL_REJECT_UNAUTHORIZED": true
   },
   "SYSLOG": {
     "ENABLED": false,
