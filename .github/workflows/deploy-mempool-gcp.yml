@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - 'opcat-dev'
+      - 'main'
   workflow_dispatch:
 
 env:
@@ -44,8 +45,7 @@ jobs:
   build:
     name: Build Mempool
     runs-on: ubuntu-latest
-    environment:
-      name: mainnet-prod
+    # Note: no 'environment' here - build runs on any allowed branch without production gate
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -206,7 +206,8 @@ jobs:
     name: Deploy to GCP
     needs: build
     runs-on: ubuntu-latest
-    if: ${{ needs.build.result == 'success' }}
+    # Only deploy to mainnet-prod from the main branch (not from opcat-dev)
+    if: ${{ needs.build.result == 'success' && github.ref == 'refs/heads/main' }}
     environment:
       name: mainnet-prod
     permissions:
