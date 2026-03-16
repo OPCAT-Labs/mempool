@@ -313,6 +313,8 @@ jobs:
           echo "📦 Installing backend dependencies..."
           cd "$RELEASE_DIR/backend"
           npm ci --omit=dev --ignore-scripts
+          echo "🔨 Rebuilding native addons on server..."
+          npm rebuild
 
           echo "📦 Installing frontend dependencies..."
           cd "$RELEASE_DIR/frontend"
