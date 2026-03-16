@@ -445,8 +445,10 @@ jobs:
             # Rollback
             if [ -n "$PREVIOUS_RELEASE" ] && [ -d "$PREVIOUS_RELEASE" ]; then
               echo "🔄 Rolling back to previous release..."
-              pm2 stop all 2>/dev/null || true
-              pm2 delete all 2>/dev/null || true
+              pm2 stop mempool-backend 2>/dev/null || true
+              pm2 delete mempool-backend 2>/dev/null || true
+              pm2 stop mempool-frontend 2>/dev/null || true
+              pm2 delete mempool-frontend 2>/dev/null || true
               ln -sfn "$PREVIOUS_RELEASE" "$CURRENT_LINK"
               cd "$CURRENT_LINK"
               MEMPOOL_BASE_DIR="$CURRENT_LINK" pm2 start ecosystem.prod.config.js
