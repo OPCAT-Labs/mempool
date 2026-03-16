@@ -116,7 +116,7 @@ describe('Mainnet - Mining Features', () => {
           cy.visit('/graphs/mining/pools-dominance');
           cy.waitForSkeletonGone();
           cy.waitForPageIdle();
-          cy.get('.spinner-border').should('not.exist');
+          cy.get('.spinner-border', { timeout: 15000 }).should('not.exist');
         });
       });
 

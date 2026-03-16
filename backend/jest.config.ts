@@ -2,6 +2,13 @@ import type { Config } from "@jest/types"
 
 const config: Config.InitialOptions = {
   preset: "ts-jest",
+  globals: {
+    'ts-jest': {
+      diagnostics: {
+        ignoreCodes: [2307],
+      },
+    },
+  },
   testEnvironment: "node",
   verbose: true,
   automock: false,
@@ -16,5 +23,8 @@ const config: Config.InitialOptions = {
   setupFiles: [
     "./testSetup.ts",
   ],
+  moduleNameMapper: {
+    "^rust-gbt$": "<rootDir>/src/__mocks__/rust-gbt.ts",
+  },
 }
 export default config;

@@ -5,7 +5,8 @@ services:
     environment:
       FRONTEND_HTTP_PORT: "8080"
       BACKEND_MAINNET_HTTP_HOST: "api"
-    image: mempool/frontend:latest
+      BLOCK_WEIGHT_UNITS: "32000000"
+    image: ghcr.io/opcat-labs/mempool-frontend:latest
     user: "1000:1000"
     restart: on-failure
     stop_grace_period: 1m

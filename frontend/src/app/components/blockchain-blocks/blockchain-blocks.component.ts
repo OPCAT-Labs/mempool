@@ -1,7 +1,7 @@
 import { Component, OnInit, OnDestroy, ChangeDetectionStrategy, ChangeDetectorRef, Input, OnChanges, SimpleChanges } from '@angular/core';
 import { Observable, Subscription, delay, filter, tap } from 'rxjs';
 import { StateService } from '@app/services/state.service';
-import { specialBlocks } from '@app/app.constants';
+import { specialBlocks, defaultMempoolFeeColors } from '@app/app.constants';
 import { BlockExtended } from '@interfaces/node-api.interface';
 import { Location } from '@angular/common';
 import { CacheService } from '@app/services/cache.service';
@@ -340,23 +340,42 @@ export class BlockchainBlocksComponent implements OnInit, OnChanges, OnDestroy {
     } else if (block.loading) {
       return this.getStyleForLoadingBlock(index, animateEnterFrom);
     }
-    const greenBackgroundHeight = 100 - (block.size / this.stateService.env.BLOCK_WEIGHT_UNITS) * 100;
+    const fillPercent = Math.min((block.size / this.stateService.env.BLOCK_WEIGHT_UNITS) * 100, 100);
+    const greenBackgroundHeight = 100 - fillPercent;
     let addLeft = 0;
 
     if (animateEnterFrom) {
       addLeft = animateEnterFrom || 0;
     }
 
+    // Get gradient colors based on fill percentage
+    const gradientColors = this.getGradientByFillPercent(fillPercent);
+
     return {
       left: addLeft + this.blockOffset * index + 'px',
       background: `repeating-linear-gradient(
         var(--secondary),
         var(--secondary) ${greenBackgroundHeight}%,
-        ${this.gradientColors[this.network][0]} ${Math.max(greenBackgroundHeight, 0)}%,
-        ${this.gradientColors[this.network][1]} 100%
+        ${gradientColors[0]} ${Math.max(greenBackgroundHeight, 0)}%,
+        ${gradientColors[1]} 100%
       )`,
       transition: animateEnterFrom ? 'background 2s, transform 1s' : null,
     };
+  }
+
+  getGradientByFillPercent(percent: number): [string, string] {
+    const colorCount = defaultMempoolFeeColors.length;
+    const clampedPercent = Math.max(0, Math.min(100, percent));
+
+    // Linear map percentage to color index
+    const index = Math.floor((clampedPercent / 100) * (colorCount - 1));
+    const primaryIndex = Math.min(index, colorCount - 1);
+    const secondaryIndex = Math.min(index + 3, colorCount - 1);
+
+    return [
+      '#' + defaultMempoolFeeColors[primaryIndex],
+      '#' + defaultMempoolFeeColors[secondaryIndex]
+    ];
   }
 
   convertStyleForLoadingBlock(style) {
