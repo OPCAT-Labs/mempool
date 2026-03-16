@@ -11,3 +11,4 @@ node_modules
 package-lock.json
 secrets.js
 .env.prod
+.claude

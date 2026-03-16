@@ -108,6 +108,7 @@ class BitcoinRoutes {
       )
       .post(config.MEMPOOL.API_URL_PREFIX + 'prevouts', this.$getPrevouts)
       .post(config.MEMPOOL.API_URL_PREFIX + 'cpfp', this.getCpfpLocalTxs)
+      .post(config.MEMPOOL.API_URL_PREFIX + 'txs/bulk', this.$getTxsByIds)
       // Temporarily add txs/package endpoint for all backends until esplora supports it
       .post(config.MEMPOOL.API_URL_PREFIX + 'txs/package', this.$submitPackage)
       // Internal routes
@@ -1420,6 +1421,46 @@ class BitcoinRoutes {
       res.json(result);
     } catch (e) {
       handleError(req, res, 500, 'Failed to get prevouts');
+    }
+  }
+
+  private async $getTxsByIds(req: Request, res: Response) {
+    try {
+      const txids = req.body;
+
+      if (!Array.isArray(txids)) {
+        handleError(req, res, 400, 'Invalid txids format: expected array');
+        return;
+      }
+
+      if (txids.length > 100) {
+        handleError(req, res, 400, 'Too many txids requested (max 100)');
+        return;
+      }
+
+      if (txids.some((txid) => !TXID_REGEX.test(txid))) {
+        handleError(req, res, 400, 'Invalid txid format');
+        return;
+      }
+
+      const concurrency = 3;
+      const transactions: (TransactionExtended | null)[] = new Array(txids.length).fill(null);
+      for (let i = 0; i < txids.length; i += concurrency) {
+        const batch = txids.slice(i, i + concurrency);
+        const results = await Promise.all(batch.map(async (txid) => {
+          try {
+            return await transactionUtils.$getTransactionExtended(txid, true, false, false, true);
+          } catch (e) {
+            logger.debug(`Transaction ${txid} not found: ${e instanceof Error ? e.message : e}`);
+            return null;
+          }
+        }));
+        results.forEach((tx, j) => { transactions[i + j] = tx; });
+      }
+
+      res.json(transactions);
+    } catch (e) {
+      handleError(req, res, 500, 'Failed to get transactions by ids');
     }
   }
 

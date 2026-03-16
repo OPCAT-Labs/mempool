@@ -1,5 +1,6 @@
 import { Price } from '@app/services/price.service';
 import { IChannel } from '@interfaces/node-api.interface';
+import { CollectionInfo, NftUtxoState, TokenInfo, TokenUtxoState } from '../services/tracker.service';
 
 export interface Transaction {
   txid: string;
@@ -92,6 +93,18 @@ interface Issuance {
   tokenamountcommitment?: string;
 }
 
+export interface CatInfo {
+  type: 'cat20' | 'cat721' | 'cat20Minter' | 'cat721Minter';
+  tokenInfo?: {
+    info: TokenInfo,
+    cat20State?: TokenUtxoState
+  };
+  collectionInfo?: {
+    info: CollectionInfo
+    cat721State?: NftUtxoState
+  }
+}
+
 export interface Vout {
   scriptpubkey: string;
   scriptpubkey_asm: string;
@@ -105,6 +118,8 @@ export interface Vout {
   pegout?: Pegout;
   // Ord
   isRunestone?: boolean;
+  // Custom
+  catInfo?: CatInfo;
 }
 
 interface Pegout {

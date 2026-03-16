@@ -1,0 +1,499 @@
+name: Deploy Mempool to Testnet
+
+on:
+  push:
+    branches:
+      - deploy-testnet
+      - add-cat20 # for test, remove this line later
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  NODE_VERSION: '20'
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build Mempool
+    runs-on: ubuntu-latest
+    environment:
+      name: testnet
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Validate required GitHub Variables
+        run: |
+          echo "🔍 Validating required GitHub Variables..."
+          MISSING_VARS=()
+
+          [ -z "${{ vars.BACKEND_PORT }}" ] && MISSING_VARS+=("BACKEND_PORT")
+          [ -z "${{ vars.ELECTRS_API }}" ] && MISSING_VARS+=("ELECTRS_API")
+          [ -z "${{ vars.TRACKER_API }}" ] && MISSING_VARS+=("TRACKER_API")
+          [ -z "${{ vars.DEPLOY_HOST_NAME }}" ] && MISSING_VARS+=("DEPLOY_HOST_NAME")
+          [ -z "${{ vars.MEMPOOL_NETWORK }}" ] && MISSING_VARS+=("MEMPOOL_NETWORK")
+          [ -z "${{ vars.FRONTEND_PORT }}" ] && MISSING_VARS+=("FRONTEND_PORT")
+          [ -z "${{ vars.ELECTRUM_HOST }}" ] && MISSING_VARS+=("ELECTRUM_HOST")
+          [ -z "${{ vars.ELECTRUM_PORT }}" ] && MISSING_VARS+=("ELECTRUM_PORT")
+          [ -z "${{ vars.CORE_RPC_HOST }}" ] && MISSING_VARS+=("CORE_RPC_HOST")
+          [ -z "${{ vars.CORE_RPC_PORT }}" ] && MISSING_VARS+=("CORE_RPC_PORT")
+          [ -z "${{ vars.CORE_RPC_USERNAME }}" ] && MISSING_VARS+=("CORE_RPC_USERNAME")
+          [ -z "${{ vars.DATABASE_HOST }}" ] && MISSING_VARS+=("DATABASE_HOST")
+          [ -z "${{ vars.DATABASE_PORT }}" ] && MISSING_VARS+=("DATABASE_PORT")
+          [ -z "${{ vars.DATABASE_NAME }}" ] && MISSING_VARS+=("DATABASE_NAME")
+          [ -z "${{ vars.DATABASE_USERNAME }}" ] && MISSING_VARS+=("DATABASE_USERNAME")
+          [ -z "${{ vars.DEPLOY_HOST }}" ] && MISSING_VARS+=("DEPLOY_HOST")
+          [ -z "${{ vars.DEPLOY_USER }}" ] && MISSING_VARS+=("DEPLOY_USER")
+          [ -z "${{ vars.DEPLOY_DIR }}" ] && MISSING_VARS+=("DEPLOY_DIR")
+          [ -z "${{ secrets.DEPLOY_SSH_KEY }}" ] && MISSING_VARS+=("DEPLOY_SSH_KEY (secret)")
+          [ -z "${{ secrets.CORE_RPC_PASSWORD }}" ] && MISSING_VARS+=("CORE_RPC_PASSWORD (secret)")
+          [ -z "${{ secrets.DATABASE_PASSWORD }}" ] && MISSING_VARS+=("DATABASE_PASSWORD (secret)")
+
+          if [ ${#MISSING_VARS[@]} -gt 0 ]; then
+            echo "❌ Missing required Variables/Secrets:"
+            printf '  - %s\n' "${MISSING_VARS[@]}"
+            exit 1
+          fi
+
+          echo "✅ All required Variables and Secrets are set"
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Set commit hash
+        run: echo "MEMPOOL_COMMIT_HASH=$(git rev-parse --short HEAD)" >> $GITHUB_ENV
+
+      # Build Backend
+      - name: Install backend dependencies
+        working-directory: backend
+        run: npm ci
+
+      - name: Build backend
+        working-directory: backend
+        run: npm run build
+        env:
+          NODE_ENV: production
+          MEMPOOL_COMMIT_HASH: ${{ env.MEMPOOL_COMMIT_HASH }}
+
+      # Build Frontend
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Generate frontend config
+        working-directory: frontend
+        run: |
+          cat > mempool-frontend-config.json << EOF
+          {
+            "TESTNET_ENABLED": false,
+            "TESTNET4_ENABLED": false,
+            "SIGNET_ENABLED": false,
+            "LIQUID_ENABLED": false,
+            "LIQUID_TESTNET_ENABLED": false,
+            "MAINNET_ENABLED": false,
+            "ITEMS_PER_PAGE": 10,
+            "KEEP_BLOCKS_AMOUNT": 8,
+            "NGINX_PROTOCOL": "http",
+            "NGINX_HOSTNAME": "127.0.0.1",
+            "NGINX_PORT": "80",
+            "BLOCK_WEIGHT_UNITS": 4000000,
+            "MEMPOOL_BLOCKS_AMOUNT": 8,
+            "BASE_MODULE": "mempool",
+            "ROOT_NETWORK": "${{ vars.MEMPOOL_NETWORK }}",
+            "MEMPOOL_WEBSITE_URL": "https://mempool.space",
+            "LIQUID_WEBSITE_URL": "https://liquid.network",
+            "MINING_DASHBOARD": true,
+            "AUDIT": false,
+            "MAINNET_BLOCK_AUDIT_START_HEIGHT": 0,
+            "TESTNET_BLOCK_AUDIT_START_HEIGHT": 0,
+            "SIGNET_BLOCK_AUDIT_START_HEIGHT": 0,
+            "LIGHTNING": false,
+            "HISTORICAL_PRICE": true,
+            "ADDITIONAL_CURRENCIES": false,
+            "ACCELERATOR": false,
+            "ACCELERATOR_BUTTON": true,
+            "PUBLIC_ACCELERATIONS": false,
+            "STRATUM_ENABLED": false,
+            "SERVICES_API": "https://${{ vars.DEPLOY_HOST_NAME }}/api/v1/services"
+          }
+          EOF
+          echo "✅ Generated mempool-frontend-config.json"
+
+      - name: Build frontend
+        working-directory: frontend
+        run: npm run build 2>&1 | grep -v "Generating localized bundles" || true
+        env:
+          NODE_ENV: production
+
+      - name: Create deployment package
+        run: |
+          echo "🔧 Creating deployment package..."
+          mkdir -p deploy
+
+          # Copy backend
+          echo "📦 Packaging backend..."
+          mkdir -p deploy/backend
+          cp -r backend/dist deploy/backend/
+          cp backend/package*.json deploy/backend/
+          cp -r backend/src deploy/backend/
+          cp -r backend/rust-gbt deploy/backend/ 2>/dev/null || echo "⚠️ rust-gbt not found, will be built on server"
+
+          # Copy frontend
+          echo "📦 Packaging frontend..."
+          mkdir -p deploy/frontend
+          cp -r frontend/dist deploy/frontend/
+          cp frontend/package*.json deploy/frontend/
+          cp frontend/server-simple.js deploy/frontend/
+
+          # Copy PM2 ecosystem config and root package.json
+          cp ecosystem.prod.config.js deploy/
+          cp package.json deploy/
+
+          # Create deployment archive
+          tar -czf deployment.tar.gz -C deploy .
+          echo "✅ Deployment package created: $(du -h deployment.tar.gz)"
+
+      - name: Verify deployment package
+        run: |
+          echo "📦 Verifying deployment package:"
+          if [ ! -f "deployment.tar.gz" ]; then
+            echo "❌ deployment.tar.gz was not created!"
+            exit 1
+          fi
+          echo "📋 Package contents preview:"
+          tar -tzf deployment.tar.gz | head -20
+          echo "Total files: $(tar -tzf deployment.tar.gz | wc -l)"
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: mempool-deployment
+          path: deployment.tar.gz
+          retention-days: 7
+
+  deploy:
+    name: Deploy to Testnet Server
+    needs: build
+    runs-on: ubuntu-latest
+    if: ${{ needs.build.result == 'success' }}
+    environment:
+      name: testnet
+      url: https://${{ vars.DEPLOY_HOST_NAME }}
+
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: mempool-deployment
+          path: ./artifacts
+
+      - name: Verify artifact download
+        run: |
+          if [ ! -f "./artifacts/deployment.tar.gz" ]; then
+            echo "❌ deployment.tar.gz not found!"
+            exit 1
+          fi
+          mv ./artifacts/deployment.tar.gz ./deployment.tar.gz
+          echo "✅ Deployment package ready: $(du -h ./deployment.tar.gz)"
+
+      - name: Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.DEPLOY_SSH_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -p ${{ vars.DEPLOY_PORT || 22 }} -H ${{ vars.DEPLOY_HOST }} >> ~/.ssh/known_hosts
+
+      - name: Upload deployment package
+        run: |
+          scp -i ~/.ssh/deploy_key \
+            -P ${{ vars.DEPLOY_PORT || 22 }} \
+            -o UserKnownHostsFile=~/.ssh/known_hosts \
+            deployment.tar.gz ${{ vars.DEPLOY_USER }}@${{ vars.DEPLOY_HOST }}:/tmp/
+
+      - name: Deploy to server
+        env:
+          CORE_RPC_PASSWORD: ${{ secrets.CORE_RPC_PASSWORD }}
+          DATABASE_PASSWORD: ${{ secrets.DATABASE_PASSWORD }}
+          DEPLOY_DIR: ${{ vars.DEPLOY_DIR }}
+          BACKEND_PORT: ${{ vars.BACKEND_PORT }}
+          FRONTEND_PORT: ${{ vars.FRONTEND_PORT }}
+          ELECTRS_API: ${{ vars.ELECTRS_API }}
+          TRACKER_API: ${{ vars.TRACKER_API }}
+          MEMPOOL_NETWORK: ${{ vars.MEMPOOL_NETWORK }}
+          ELECTRUM_HOST: ${{ vars.ELECTRUM_HOST }}
+          ELECTRUM_PORT: ${{ vars.ELECTRUM_PORT }}
+          ELECTRUM_TLS_ENABLED: ${{ vars.ELECTRUM_TLS_ENABLED }}
+          CORE_RPC_HOST: ${{ vars.CORE_RPC_HOST }}
+          CORE_RPC_PORT: ${{ vars.CORE_RPC_PORT }}
+          CORE_RPC_USERNAME: ${{ vars.CORE_RPC_USERNAME }}
+          DATABASE_HOST: ${{ vars.DATABASE_HOST }}
+          DATABASE_PORT: ${{ vars.DATABASE_PORT }}
+          DATABASE_NAME: ${{ vars.DATABASE_NAME }}
+          DATABASE_USERNAME: ${{ vars.DATABASE_USERNAME }}
+          DATABASE_SSL: ${{ vars.DATABASE_SSL }}
+          DATABASE_SSL_REJECT_UNAUTHORIZED: ${{ vars.DATABASE_SSL_REJECT_UNAUTHORIZED }}
+          MEMPOOL_BACKEND: ${{ vars.MEMPOOL_BACKEND }}
+          DEPLOY_HOST_NAME: ${{ vars.DEPLOY_HOST_NAME }}
+        run: |
+          ssh -i ~/.ssh/deploy_key \
+            -p ${{ vars.DEPLOY_PORT || 22 }} \
+            -o UserKnownHostsFile=~/.ssh/known_hosts \
+            ${{ vars.DEPLOY_USER }}@${{ vars.DEPLOY_HOST }} \
+            env DEPLOY_DIR="$DEPLOY_DIR" \
+                BACKEND_PORT="$BACKEND_PORT" \
+                FRONTEND_PORT="$FRONTEND_PORT" \
+                ELECTRS_API="$ELECTRS_API" \
+                TRACKER_API="$TRACKER_API" \
+                MEMPOOL_NETWORK="$MEMPOOL_NETWORK" \
+                ELECTRUM_HOST="$ELECTRUM_HOST" \
+                ELECTRUM_PORT="$ELECTRUM_PORT" \
+                ELECTRUM_TLS_ENABLED="$ELECTRUM_TLS_ENABLED" \
+                CORE_RPC_HOST="$CORE_RPC_HOST" \
+                CORE_RPC_PORT="$CORE_RPC_PORT" \
+                CORE_RPC_USERNAME="$CORE_RPC_USERNAME" \
+                CORE_RPC_PASSWORD="$CORE_RPC_PASSWORD" \
+                DATABASE_HOST="$DATABASE_HOST" \
+                DATABASE_PORT="$DATABASE_PORT" \
+                DATABASE_NAME="$DATABASE_NAME" \
+                DATABASE_USERNAME="$DATABASE_USERNAME" \
+                DATABASE_PASSWORD="$DATABASE_PASSWORD" \
+                DATABASE_SSL="$DATABASE_SSL" \
+                DATABASE_SSL_REJECT_UNAUTHORIZED="$DATABASE_SSL_REJECT_UNAUTHORIZED" \
+                MEMPOOL_BACKEND="$MEMPOOL_BACKEND" \
+                DEPLOY_HOST_NAME="$DEPLOY_HOST_NAME" \
+            bash << 'DEPLOY_SCRIPT'
+
+          set -euo pipefail
+
+          # =============================================================================
+          # Configuration
+          # =============================================================================
+          MAX_RELEASES=3
+          RELEASES_DIR="${DEPLOY_DIR}/releases"
+          SHARED_DIR="${DEPLOY_DIR}/shared"
+          CURRENT_LINK="${DEPLOY_DIR}/current"
+          RELEASE_NAME="release-$(date +%Y%m%d_%H%M%S)"
+          RELEASE_DIR="${RELEASES_DIR}/${RELEASE_NAME}"
+
+          # Load nvm
+          export NVM_DIR="$HOME/.nvm"
+          [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+
+          # Verify PM2
+          if ! which pm2 > /dev/null 2>&1; then
+            echo "⚠️ PM2 not found, installing..."
+            npm install -g pm2
+            export PATH="$PATH:$(npm config get prefix)/bin"
+          fi
+          echo "✅ PM2: $(which pm2)"
+
+          # =============================================================================
+          # Create release directory and extract
+          # =============================================================================
+          echo "🚀 Creating release: ${RELEASE_NAME}"
+          mkdir -p "$RELEASES_DIR" "$SHARED_DIR" "$SHARED_DIR/logs"
+          mkdir -p "$RELEASE_DIR"
+          tar -xzf /tmp/deployment.tar.gz -C "$RELEASE_DIR"
+          rm -f /tmp/deployment.tar.gz
+
+          # Symlink shared logs
+          ln -sf "$SHARED_DIR/logs" "$RELEASE_DIR/logs"
+
+          # =============================================================================
+          # Install dependencies
+          # =============================================================================
+          echo "📦 Installing backend dependencies..."
+          cd "$RELEASE_DIR/backend"
+          npm ci --omit=dev --ignore-scripts
+
+          echo "📦 Installing frontend dependencies..."
+          cd "$RELEASE_DIR/frontend"
+          npm ci --omit=dev --ignore-scripts
+
+          echo "📦 Installing root dependencies..."
+          cd "$RELEASE_DIR"
+          npm install
+
+          # =============================================================================
+          # Write shared .env.prod (non-sensitive vars)
+          # =============================================================================
+          echo "📝 Writing environment configuration..."
+          cat > "${SHARED_DIR}/.env.prod" << EOF
+          # backend env
+          MEMPOOL_NETWORK=${MEMPOOL_NETWORK}
+          MEMPOOL_HTTP_PORT=${BACKEND_PORT}
+          MEMPOOL_BACKEND=${MEMPOOL_BACKEND}
+          DATABASE_HOST=${DATABASE_HOST}
+          DATABASE_PORT=${DATABASE_PORT}
+          DATABASE_NAME=${DATABASE_NAME}
+          DATABASE_USERNAME=${DATABASE_USERNAME}
+          DATABASE_SSL=${DATABASE_SSL}
+          DATABASE_SSL_REJECT_UNAUTHORIZED=${DATABASE_SSL_REJECT_UNAUTHORIZED}
+          ELECTRUM_HOST=${ELECTRUM_HOST}
+          ELECTRUM_PORT=${ELECTRUM_PORT}
+          ELECTRUM_TLS_ENABLED=${ELECTRUM_TLS_ENABLED}
+          CORE_RPC_HOST=${CORE_RPC_HOST}
+          CORE_RPC_PORT=${CORE_RPC_PORT}
+          CORE_RPC_USERNAME=${CORE_RPC_USERNAME}
+
+          # frontend env
+          FRONTEND_PORT=${FRONTEND_PORT}
+          BACKEND_API=http://127.0.0.1:${BACKEND_PORT}
+          ELECTRS_API=${ELECTRS_API}
+          TRACKER_API=${TRACKER_API}
+          NODE_ENV=production
+          EOF
+
+          # Write secrets.js (sensitive vars, loaded by ecosystem.prod.config.js)
+          cat > "${SHARED_DIR}/secrets.js" << EOF
+          module.exports = {
+            CORE_RPC_PASSWORD: '${CORE_RPC_PASSWORD}',
+            DATABASE_PASSWORD: '${DATABASE_PASSWORD}',
+          };
+          EOF
+          chmod 600 "${SHARED_DIR}/secrets.js"
+
+          # Symlink shared files into release
+          ln -sf "${SHARED_DIR}/.env.prod" "${RELEASE_DIR}/.env.prod"
+          ln -sf "${SHARED_DIR}/secrets.js" "${RELEASE_DIR}/secrets.js"
+
+          # =============================================================================
+          # Stop current PM2 services
+          # =============================================================================
+          echo "🛑 Stopping current services..."
+          pm2 stop mempool-backend 2>/dev/null && echo "✅ Backend stopped" || echo "⏭️ No backend to stop"
+          pm2 stop mempool-frontend 2>/dev/null && echo "✅ Frontend stopped" || echo "⏭️ No frontend to stop"
+          pm2 delete mempool-backend 2>/dev/null || true
+          pm2 delete mempool-frontend 2>/dev/null || true
+
+          # =============================================================================
+          # Switch symlink to new release
+          # =============================================================================
+          PREVIOUS_RELEASE=""
+          if [ -L "$CURRENT_LINK" ]; then
+            PREVIOUS_RELEASE=$(readlink -f "$CURRENT_LINK")
+            echo "📌 Previous release: $PREVIOUS_RELEASE"
+          fi
+
+          echo "🔗 Switching symlink to new release..."
+          ln -sfn "$RELEASE_DIR" "$CURRENT_LINK"
+          echo "✅ current -> ${RELEASE_NAME}"
+
+          # =============================================================================
+          # Start PM2 from current symlink
+          # =============================================================================
+          echo "🚀 Starting services with PM2..."
+          cd "$CURRENT_LINK"
+          MEMPOOL_BASE_DIR="$CURRENT_LINK" pm2 start ecosystem.prod.config.js
+          pm2 save
+
+          # =============================================================================
+          # Verify deployment
+          # =============================================================================
+          echo "🔍 Verifying deployment..."
+
+          MAX_ATTEMPTS=6
+          WAIT_INTERVAL=5
+          STABLE_COUNT=0
+          REQUIRED_STABLE=2
+          DEPLOY_SUCCESS=false
+
+          for ((i=1; i<=MAX_ATTEMPTS; i++)); do
+            sleep $WAIT_INTERVAL
+
+            BACKEND_ONLINE=0
+            FRONTEND_ONLINE=0
+
+            pm2 show mempool-backend 2>/dev/null | grep -q "status.*online" && BACKEND_ONLINE=1
+            pm2 show mempool-frontend 2>/dev/null | grep -q "status.*online" && FRONTEND_ONLINE=1
+
+            echo "   Check $i/$MAX_ATTEMPTS: backend=$BACKEND_ONLINE, frontend=$FRONTEND_ONLINE"
+
+            if [ $BACKEND_ONLINE -eq 1 ] && [ $FRONTEND_ONLINE -eq 1 ]; then
+              STABLE_COUNT=$((STABLE_COUNT + 1))
+              if [ $STABLE_COUNT -ge $REQUIRED_STABLE ]; then
+                DEPLOY_SUCCESS=true
+                break
+              fi
+            else
+              STABLE_COUNT=0
+            fi
+          done
+
+          if [ "$DEPLOY_SUCCESS" = true ]; then
+            curl -sf http://localhost:${BACKEND_PORT}/api/v1/blocks/tip/height > /dev/null && \
+              echo "✅ Backend health check passed!" || echo "⚠️ Backend health check not responding yet"
+            curl -sf http://localhost:${FRONTEND_PORT}/api/v1/blocks/tip/height > /dev/null && \
+              echo "✅ Frontend health check passed!" || echo "⚠️ Frontend health check not responding yet"
+            pm2 list
+            echo "🎉 Deployment completed successfully!"
+          else
+            echo "❌ Services failed to stabilize!"
+            pm2 list
+            pm2 logs --lines 30 --nostream
+
+            # Rollback
+            if [ -n "$PREVIOUS_RELEASE" ] && [ -d "$PREVIOUS_RELEASE" ]; then
+              echo "🔄 Rolling back to previous release..."
+              pm2 stop all 2>/dev/null || true
+              pm2 delete all 2>/dev/null || true
+              ln -sfn "$PREVIOUS_RELEASE" "$CURRENT_LINK"
+              cd "$CURRENT_LINK"
+              MEMPOOL_BASE_DIR="$CURRENT_LINK" pm2 start ecosystem.prod.config.js
+              pm2 save
+              rm -rf "$RELEASE_DIR"
+              echo "🔄 Rollback completed"
+            fi
+
+            exit 1
+          fi
+
+          # =============================================================================
+          # Cleanup old releases
+          # =============================================================================
+          echo "🧹 Cleaning up old releases..."
+          cd "$RELEASES_DIR"
+          RELEASE_COUNT=$(ls -1d release-* 2>/dev/null | wc -l)
+          if [ "$RELEASE_COUNT" -gt "$MAX_RELEASES" ]; then
+            ls -1td release-* | tail -n +$((MAX_RELEASES + 1)) | while read OLD_RELEASE; do
+              echo "   Removing: $OLD_RELEASE"
+              rm -rf "$OLD_RELEASE"
+            done
+            echo "✅ Cleanup complete. Keeping last ${MAX_RELEASES} releases."
+          else
+            echo "✅ No cleanup needed ($RELEASE_COUNT releases)"
+          fi
+
+          DEPLOY_SCRIPT
+
+      - name: Cleanup SSH
+        if: always()
+        run: rm -f ~/.ssh/deploy_key
+
+  notify:
+    name: Notify Deployment Result
+    needs: [build, deploy]
+    runs-on: ubuntu-latest
+    if: always()
+
+    steps:
+      - name: Notify success
+        if: needs.deploy.result == 'success'
+        run: |
+          echo "✅ Deployment to testnet completed successfully!"
+          echo "🚀 Mempool is now live on testnet"
+
+      - name: Notify failure
+        if: needs.deploy.result == 'failure'
+        run: |
+          echo "❌ Deployment to testnet failed!"
+          echo "Please check the deployment logs and server status"
+          exit 1
