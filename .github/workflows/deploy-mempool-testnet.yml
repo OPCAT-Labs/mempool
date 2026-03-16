@@ -76,7 +76,8 @@ jobs:
         working-directory: backend
         run: |
           npm ci --ignore-scripts
-          ln -sf ../rust-gbt node_modules/rust-gbt
+          rm -rf node_modules/rust-gbt
+          cp -R rust-gbt node_modules/rust-gbt
 
       - name: Build backend
         working-directory: backend
