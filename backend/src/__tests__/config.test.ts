@@ -99,6 +99,8 @@ describe('Mempool Backend Config', () => {
         TIMEOUT: 180000,
         PID_DIR: '',
         POOL_SIZE: 100,
+        SSL: false,
+        SSL_REJECT_UNAUTHORIZED: true,
       });
 
       expect(config.SYSLOG).toStrictEqual({

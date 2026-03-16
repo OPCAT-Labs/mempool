@@ -144,10 +144,8 @@ describe('Mempool Difficulty Adjustment', () => {
     expect(calcBitsDifference(0x1d000001, 0x1c000200)).toEqual(-50);
     expect(calcBitsDifference(0x1d000001, 0x1c000400)).toEqual(-75);
     expect(calcBitsDifference(0x1d000001, 0x1c000800)).toEqual(-75);
-    // Check error when exponents are too far apart
-    expect(() => calcBitsDifference(0x1d000001, 0x1a000800)).toThrow(
-      /Impossible exponent difference/
-    );
+    // Large exponent differences are now handled via BigInt (for OPCAT chains), capped at 300
+    expect(calcBitsDifference(0x1d000001, 0x1a000800)).toEqual(300);
     // Check invalid inputs
     expect(() => calcBitsDifference(0x7f000001, 0x1a000800)).toThrow(
       /Invalid bits/
