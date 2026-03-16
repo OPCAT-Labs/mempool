@@ -245,7 +245,7 @@ export class CatService {
                   address: state.ownerAddr,
                 }
               }
-            };
+            }
           }
         })
         return tx;
