@@ -74,11 +74,11 @@ jobs:
       # Build Backend
       - name: Install backend dependencies
         working-directory: backend
-        run: npm ci
+        run: npm ci --ignore-scripts
 
       - name: Build backend
         working-directory: backend
-        run: npm run build
+        run: npm run tsc && npm run create-resources
         env:
           NODE_ENV: production
           MEMPOOL_COMMIT_HASH: ${{ env.MEMPOOL_COMMIT_HASH }}
@@ -313,8 +313,6 @@ jobs:
           echo "📦 Installing backend dependencies..."
           cd "$RELEASE_DIR/backend"
           npm ci --omit=dev --ignore-scripts
-          echo "🔨 Rebuilding native addons on server..."
-          npm rebuild
 
           echo "📦 Installing frontend dependencies..."
           cd "$RELEASE_DIR/frontend"
