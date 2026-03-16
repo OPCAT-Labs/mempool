@@ -83,6 +83,20 @@ jobs:
           NODE_ENV: production
           MEMPOOL_COMMIT_HASH: ${{ env.MEMPOOL_COMMIT_HASH }}
 
+      - name: Rebuild rust-gbt for older GLIBC compatibility
+        run: |
+          docker run --rm \
+            -v "$GITHUB_WORKSPACE/rust/gbt":/build \
+            -w /build \
+            node:20-bullseye \
+            bash -c "
+              curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain 1.84 &&
+              export PATH=\$HOME/.cargo/bin:\$PATH &&
+              npm install --no-save @napi-rs/cli@2.18.0 &&
+              npx napi build --platform --release --strip
+            "
+          cp rust/gbt/gbt.linux-x64-gnu.node backend/rust-gbt/
+
       # Build Frontend
       - name: Install frontend dependencies
         working-directory: frontend
@@ -144,12 +158,7 @@ jobs:
           cp -r backend/dist deploy/backend/
           cp backend/package*.json deploy/backend/
           cp -r backend/src deploy/backend/
-          cp -r backend/rust-gbt deploy/backend/ 2>/dev/null || echo "⚠️ rust-gbt not found, will be built on server"
-
-          # Copy rust/gbt source for native addon compilation on server
-          echo "📦 Packaging rust-gbt source..."
-          mkdir -p deploy/rust
-          cp -r rust/gbt deploy/rust/
+          cp -r backend/rust-gbt deploy/backend/ 2>/dev/null || echo "⚠️ rust-gbt not found"
 
           # Copy frontend
           echo "📦 Packaging frontend..."
@@ -318,10 +327,6 @@ jobs:
           echo "📦 Installing backend dependencies..."
           cd "$RELEASE_DIR/backend"
           npm ci --omit=dev --ignore-scripts
-
-          echo "🔨 Building rust-gbt native addon on server..."
-          cd "$RELEASE_DIR/rust/gbt"
-          npm run build-release && npm run to-backend
 
           echo "📦 Installing frontend dependencies..."
           cd "$RELEASE_DIR/frontend"
