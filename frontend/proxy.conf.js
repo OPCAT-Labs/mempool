@@ -20,26 +20,20 @@ try {
 
 PROXY_CONFIG = [
     {
-        context: ['/api/v1/txs/bulk'],
-        target: "http://127.0.0.1:8999",
-        secure: false,
-        changeOrigin: true
-    },
-    {
         context: ['*',
         '/api/**', '!/api/v1/ws',
         '!/liquid', '!/liquid/**', '!/liquid/',
         '!/liquidtestnet', '!/liquidtestnet/**', '!/liquidtestnet/',
         '/testnet/api/**', '/signet/api/**', '/testnet4/api/**'
         ],
-        target: "https://testnet.opcatlabs.io",
+        target: "https://mempool.space",
         ws: true,
         secure: false,
         changeOrigin: true
     },
     {
         context: ['/api/v1/ws'],
-        target: "https://testnet.opcatlabs.io",
+        target: "https://mempool.space",
         ws: true,
         secure: false,
         changeOrigin: true,
@@ -63,7 +57,7 @@ PROXY_CONFIG = [
     },
     {
       context: ['/resources/mining-pools/**'],
-      target: "https://testnet.opcatlabs.io",
+      target: "https://mempool.space",
       secure: false,
       changeOrigin: true
   }
