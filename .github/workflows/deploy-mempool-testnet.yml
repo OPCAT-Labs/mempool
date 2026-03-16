@@ -74,14 +74,11 @@ jobs:
       # Build Backend
       - name: Install backend dependencies
         working-directory: backend
-        run: |
-          npm ci --ignore-scripts
-          rm -rf node_modules/rust-gbt
-          cp -R rust-gbt node_modules/rust-gbt
+        run: npm ci
 
       - name: Build backend
         working-directory: backend
-        run: npm run tsc && npm run create-resources
+        run: npm run build
         env:
           NODE_ENV: production
           MEMPOOL_COMMIT_HASH: ${{ env.MEMPOOL_COMMIT_HASH }}
@@ -148,6 +145,11 @@ jobs:
           cp backend/package*.json deploy/backend/
           cp -r backend/src deploy/backend/
           cp -r backend/rust-gbt deploy/backend/ 2>/dev/null || echo "⚠️ rust-gbt not found, will be built on server"
+
+          # Copy rust/gbt source for native addon compilation on server
+          echo "📦 Packaging rust-gbt source..."
+          mkdir -p deploy/rust
+          cp -r rust/gbt deploy/rust/
 
           # Copy frontend
           echo "📦 Packaging frontend..."
@@ -316,6 +318,10 @@ jobs:
           echo "📦 Installing backend dependencies..."
           cd "$RELEASE_DIR/backend"
           npm ci --omit=dev --ignore-scripts
+
+          echo "🔨 Building rust-gbt native addon on server..."
+          cd "$RELEASE_DIR/rust/gbt"
+          npm run build-release && npm run to-backend
 
           echo "📦 Installing frontend dependencies..."
           cd "$RELEASE_DIR/frontend"
