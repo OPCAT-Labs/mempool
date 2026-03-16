@@ -6,6 +6,9 @@ module.exports = (config) => {
   config.optimization.mangleExports = false;
   config.optimization.minimizer = [
     new TerserPlugin({
+      // Exclude config.template.js — it contains shell template vars (${__VAR__})
+      // that are not valid JS and cannot be minified by Terser
+      exclude: /config\.template\.js$/,
       terserOptions: {
         compress: {
           keep_classnames: true,
