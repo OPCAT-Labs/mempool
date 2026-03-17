@@ -7,7 +7,9 @@
       "@app/*" : ["src/app/*"],
       "@components/*" : ["src/app/components/*"],
       "@environments/*" : ["src/environments/*"],
-      "@interfaces/*" : ["src/app/interfaces/*"]
+      "@interfaces/*" : ["src/app/interfaces/*"],
+      "@opcat-labs/cat-sdk": ["node_modules/@opcat-labs/cat-sdk/dist/cjs/index.js"],
+      "@opcat-labs/cat-sdk/*": ["node_modules/@opcat-labs/cat-sdk/dist/cjs/*"]
     }
   },
   "files": [

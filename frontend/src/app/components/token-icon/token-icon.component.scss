@@ -1,0 +1,28 @@
+.token-icon-wrapper {
+  display: inline-block;
+  vertical-align: middle;
+  position: relative;
+
+  .token-icon-image {
+    display: block;
+    border-radius: 50%;
+    object-fit: cover;
+  }
+
+  .token-icon-fallback {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    font-weight: bold;
+    text-transform: uppercase;
+    user-select: none;
+
+    // Dark theme support
+    .theme-dark & {
+      background: linear-gradient(135deg, #4a5568 0%, #2d3748 100%);
+    }
+  }
+}

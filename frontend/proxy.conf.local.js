@@ -35,8 +35,15 @@ PROXY_CONFIG.push(
       },
     },
     {
+      context: ["/api/tracker/api/**"],
+      target: `https://testnet.opcatlabs.io`,
+      secure: false,
+      changeOrigin: true,
+      proxyTimeout: 30000,
+    },
+    {
       context: ["/api/address/**/utxo"],
-      target: `http://localhost:3006`,
+      target: `http://157.245.154.198:3006`,
       secure: false,
       changeOrigin: true,
       proxyTimeout: 30000,
@@ -56,7 +63,7 @@ PROXY_CONFIG.push(
     },
     {
       context: ["/api/scripthash/**"],
-      target: `http://localhost:3006`,
+      target: `http://157.245.154.198:3006`,
       secure: false,
       changeOrigin: true,
       proxyTimeout: 30000,
@@ -66,7 +73,7 @@ PROXY_CONFIG.push(
     },
     {
       context: ["/api/address/**/txs"],
-      target: `http://localhost:3006`,
+      target: `http://157.245.154.198:3006`,
       secure: false,
       changeOrigin: true,
       proxyTimeout: 30000,
@@ -76,7 +83,7 @@ PROXY_CONFIG.push(
     },
     {
       context: ["/api/address/**"],
-      target: `http://localhost:3006`,
+      target: `http://157.245.154.198:3006`,
       secure: false,
       changeOrigin: true,
       proxyTimeout: 30000,
@@ -86,7 +93,7 @@ PROXY_CONFIG.push(
     },
     {
       context: ["/api/address/**/txs/summary"],
-      target: `http://localhost:3006`,
+      target: `http://157.245.154.198:3006`,
       secure: false,
       changeOrigin: true,
       proxyTimeout: 30000,

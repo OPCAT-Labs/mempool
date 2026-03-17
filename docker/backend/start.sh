@@ -86,6 +86,8 @@ __DATABASE_PASSWORD__=${DATABASE_PASSWORD:=mempool}
 __DATABASE_TIMEOUT__=${DATABASE_TIMEOUT:=180000}
 __DATABASE_PID_DIR__=${DATABASE_PID_DIR:=""}
 __DATABASE_POOL_SIZE__=${DATABASE_POOL_SIZE:=100}
+__DATABASE_SSL__=${DATABASE_SSL:=false}
+__DATABASE_SSL_REJECT_UNAUTHORIZED__=${DATABASE_SSL_REJECT_UNAUTHORIZED:=true}
 
 # SYSLOG
 __SYSLOG_ENABLED__=${SYSLOG_ENABLED:=false}
@@ -245,6 +247,8 @@ sed -i "s!__DATABASE_PASSWORD__!${__DATABASE_PASSWORD__}!g" mempool-config.json
 sed -i "s!__DATABASE_TIMEOUT__!${__DATABASE_TIMEOUT__}!g" mempool-config.json
 sed -i "s!__DATABASE_PID_DIR__!${__DATABASE_PID_DIR__}!g" mempool-config.json
 sed -i "s!__DATABASE_POOL_SIZE__!${__DATABASE_POOL_SIZE__}!g" mempool-config.json
+sed -i "s!__DATABASE_SSL__!${__DATABASE_SSL__}!g" mempool-config.json
+sed -i "s!__DATABASE_SSL_REJECT_UNAUTHORIZED__!${__DATABASE_SSL_REJECT_UNAUTHORIZED__}!g" mempool-config.json
 
 sed -i "s!__SYSLOG_ENABLED__!${__SYSLOG_ENABLED__}!g" mempool-config.json
 sed -i "s!__SYSLOG_HOST__!${__SYSLOG_HOST__}!g" mempool-config.json

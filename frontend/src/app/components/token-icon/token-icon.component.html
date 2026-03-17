@@ -1,0 +1,17 @@
+<div class="token-icon-wrapper" [ngClass]="className">
+  <img *ngIf="!showFallback && imageUrl"
+       [src]="imageUrl"
+       [alt]="symbol || name || 'Token Icon'"
+       [width]="size"
+       [height]="size"
+       class="token-icon-image"
+       (error)="onImageError()"
+       loading="lazy">
+
+  <div *ngIf="showFallback || !imageUrl"
+       class="token-icon-fallback"
+       [ngStyle]="getFallbackStyles()"
+       [attr.aria-label]="symbol || name || 'Token'">
+    {{ firstLetter }}
+  </div>
+</div>

@@ -47,6 +47,9 @@ describe('Mainnet', () => {
     cy.intercept('/api/address-prefix/1wizS').as('search-1wizS');
     cy.intercept('/api/address-prefix/1wizSA').as('search-1wizSA');
 
+    // Stub CAT20 token search endpoint — not available in E2E test environment
+    cy.intercept('GET', '**/tracker/api/tokens/search**', { statusCode: 200, body: { code: 0, data: { tokens: [] } } }).as('token-search-stub');
+
     // Cypress.Commands.add('waitForBlockData', () => {
     //   cy.wait('@tx-outspends');
     //   cy.wait('@pools');

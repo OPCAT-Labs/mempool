@@ -115,6 +115,14 @@ const routes: Routes = [
           import('@components/block/block.module').then((m) => m.BlockModule),
       },
       {
+        path: 'cat20',
+        data: { preload: true, networkSpecific: true },
+        loadChildren: () =>
+          import('@components/cat20-token/cat20-token.module').then(
+            (m) => m.Cat20TokenModule
+          ),
+      },
+      {
         path: 'docs',
         loadChildren: () =>
           import('@app/docs/docs.module').then((m) => m.DocsModule),

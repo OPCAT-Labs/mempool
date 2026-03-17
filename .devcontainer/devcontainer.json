@@ -1,0 +1,16 @@
+{
+  "name": "Mempool Dev",
+  "image": "mcr.microsoft.com/devcontainers/javascript-node:22",
+  "workspaceFolder": "/workspaces/mempool",
+  "workspaceMount": "source=${localWorkspaceFolder},target=/workspaces/mempool,type=bind",
+  "forwardPorts": [3000, 4200, 8080, 8999],
+  "appPort": [
+    "3000:3000",
+    "4200:4200",
+    "8080:8080",
+    "8999:8999"
+  ],
+  "features": {
+    "ghcr.io/devcontainers/features/rust:1": {}
+  }
+}

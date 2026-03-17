@@ -19,6 +19,7 @@ import { seoDescriptionNetwork } from '@app/shared/common.utils';
 import { AddressInformation } from '@interfaces/node-api.interface';
 import { AddressTypeInfo } from '@app/shared/address-utils';
 import { convertTransactions } from '@app/shared/transaction.utils';
+import { Cat20ApiService, Cat20Balance } from '@app/services/cat20-api.service';
 
 class AddressStats implements ChainStats {
   address: string;
@@ -115,6 +116,7 @@ class AddressStats implements ChainStats {
 })
 export class AddressComponent implements OnInit, OnDestroy {
   network = '';
+  Math = Math; // Make Math available in template
 
   isMobile: boolean;
   showQR: boolean = false;
@@ -145,6 +147,29 @@ export class AddressComponent implements OnInit, OnDestroy {
   now = Date.now() / 1000;
   balancePeriod: 'all' | '1m' = 'all';
 
+  // Tab state for BTC and CAT20 balances
+  activeBalanceTab: 'btc' | 'cat20' = 'btc';
+
+  // CAT20 balances data
+  cat20Balances: Cat20Balance[] = [];
+  isLoadingCat20Balances = false;
+
+  // CAT20 balances pagination
+  cat20BalancesPage = 1;
+  cat20BalancesPageSize = 10;
+  cat20BalancesTotalPages = 1;
+
+  // Transaction tabs
+  activeTransactionTab: 'all' | 'cat20' = 'all';
+
+  // CAT20 transactions data
+  cat20Transactions: Transaction[] = [];
+  isLoadingCat20Transactions = false;
+  cat20TransactionsTotal = 0;
+  cat20TransactionsOffset = 0;
+  cat20TransactionsLimit = 25;
+  fullyCat20Loaded = false;
+
   private tempTransactions: Transaction[];
   private timeTxIndexes: number[];
   private lastTransactionTxId: string;
@@ -156,7 +181,8 @@ export class AddressComponent implements OnInit, OnDestroy {
     public stateService: StateService,
     private audioService: AudioService,
     private apiService: ApiService,
-    private seoService: SeoService
+    private seoService: SeoService,
+    private cat20ApiService: Cat20ApiService
   ) {}
 
   ngOnInit(): void {
@@ -189,6 +215,20 @@ export class AddressComponent implements OnInit, OnDestroy {
           this.addressInfo = null;
           this.exampleChannel = null;
           this.hasTapTree = false;
+
+          // Reset CAT20 data
+          this.cat20Balances = [];
+          this.cat20Transactions = [];
+          this.cat20TransactionsOffset = 0;
+          this.cat20TransactionsTotal = 0;
+          this.fullyCat20Loaded = false;
+          this.isLoadingCat20Balances = false;
+          this.isLoadingCat20Transactions = false;
+
+          // Reset CAT20 pagination
+          this.cat20BalancesPage = 1;
+          this.cat20BalancesTotalPages = 1;
+
           document.body.scrollTo(0, 0);
           this.addressString = params.get('id') || '';
           if (
@@ -374,6 +414,9 @@ export class AddressComponent implements OnInit, OnDestroy {
             this.fullyLoaded = true;
           }
           this.isLoadingTransactions = false;
+
+          // Load CAT20 balances
+          this.loadCat20Balances();
 
           let addressVin: Vin[] = [];
           let vinIds: string[] = [];
@@ -621,6 +664,104 @@ export class AddressComponent implements OnInit, OnDestroy {
   setBalancePeriod(period: 'all' | '1m'): boolean {
     this.balancePeriod = period;
     return false;
+  }
+
+  setActiveBalanceTab(tab: 'btc' | 'cat20'): void {
+    this.activeBalanceTab = tab;
+  }
+
+  setActiveTransactionTab(tab: 'all' | 'cat20'): void {
+    this.activeTransactionTab = tab;
+
+    // Load CAT20 transactions when switching to CAT20 tab
+    if (tab === 'cat20' && this.cat20Transactions.length === 0 && !this.isLoadingCat20Transactions) {
+      this.loadCat20Transactions();
+    }
+  }
+
+  loadCat20Balances(): void {
+    if (!this.addressString) {
+      return;
+    }
+
+    this.isLoadingCat20Balances = true;
+    this.cat20ApiService.getCat20Balances(this.addressString).subscribe({
+      next: (balances: Cat20Balance[]) => {
+        this.cat20Balances = balances;
+        this.cat20BalancesTotalPages = Math.ceil(balances.length / this.cat20BalancesPageSize);
+        this.cat20BalancesPage = 1; // Reset to first page
+        this.isLoadingCat20Balances = false;
+      },
+      error: (error: any) => {
+        console.error('Error loading CAT20 balances:', error);
+        this.cat20Balances = [];
+        this.cat20BalancesTotalPages = 1;
+        this.cat20BalancesPage = 1;
+        this.isLoadingCat20Balances = false;
+      }
+    });
+  }
+
+  loadCat20Transactions(): void {
+    if (!this.addressString || this.isLoadingCat20Transactions || this.fullyCat20Loaded) {
+      return;
+    }
+
+    this.isLoadingCat20Transactions = true;
+    this.cat20ApiService.getCat20Transactions(
+      this.addressString,
+      this.cat20TransactionsOffset,
+      this.cat20TransactionsLimit
+    ).subscribe({
+      next: (result: { txs: Transaction[], total: number }) => {
+        if (result.txs.length === 0) {
+          this.fullyCat20Loaded = true;
+        } else {
+          this.cat20Transactions = [...this.cat20Transactions, ...result.txs];
+          this.cat20TransactionsTotal = result.total;
+          this.cat20TransactionsOffset += result.txs.length;
+
+          if (this.cat20Transactions.length >= result.total) {
+            this.fullyCat20Loaded = true;
+          }
+        }
+        this.isLoadingCat20Transactions = false;
+      },
+      error: (error: any) => {
+        console.error('Error loading CAT20 transactions:', error);
+        this.isLoadingCat20Transactions = false;
+      }
+    });
+  }
+
+  loadMoreCat20Transactions(): void {
+    this.loadCat20Transactions();
+  }
+
+  formatTokenBalance(balance: string, decimals: number): string {
+    try {
+      const balanceNum = parseFloat(balance);
+      if (isNaN(balanceNum)) {
+        return '0';
+      }
+      const actualBalance = balanceNum / Math.pow(10, decimals);
+      return actualBalance.toLocaleString('en-US', {
+        minimumFractionDigits: 0,
+        maximumFractionDigits: decimals
+      });
+    } catch (e) {
+      return '0';
+    }
+  }
+
+  get paginatedCat20Balances(): Cat20Balance[] {
+    const startIndex = (this.cat20BalancesPage - 1) * this.cat20BalancesPageSize;
+    const endIndex = startIndex + this.cat20BalancesPageSize;
+    return this.cat20Balances.slice(startIndex, endIndex);
+  }
+
+  onCat20BalancesPageChange(page: number): void {
+    this.cat20BalancesPage = page;
   }
 
   showBalancePeriod(): boolean {
