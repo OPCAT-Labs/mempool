@@ -25,11 +25,17 @@ export class SeoService {
     // save original meta tags
     this.baseDescription = metaService.getTag('name=\'description\'')?.content || this.baseDescription;
     this.baseTitle = titleService.getTitle()?.split(' - ')?.[0] || this.baseTitle;
-    try {
-      const canonicalUrl = new URL(this.canonicalLink?.href || '');
-      this.baseDomain = canonicalUrl?.host;
-    } catch (e) {
-      // leave as default
+    // Use the live host so iOS Safari's Share → Copy Link (which reads <link rel="canonical">) matches the actual page URL.
+    if (typeof window !== 'undefined' && window.location?.host) {
+      this.baseDomain = window.location.host;
+      this.canonicalLink?.setAttribute('href', window.location.origin + window.location.pathname);
+    } else {
+      try {
+        const canonicalUrl = new URL(this.canonicalLink?.href || '');
+        this.baseDomain = canonicalUrl?.host;
+      } catch (e) {
+        // leave as default
+      }
     }
 
     this.stateService.networkChanged$.subscribe((network) => this.network = network);
