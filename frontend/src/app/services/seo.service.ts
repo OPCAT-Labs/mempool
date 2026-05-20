@@ -25,10 +25,11 @@ export class SeoService {
     // save original meta tags
     this.baseDescription = metaService.getTag('name=\'description\'')?.content || this.baseDescription;
     this.baseTitle = titleService.getTitle()?.split(' - ')?.[0] || this.baseTitle;
-    // Use the live host so iOS Safari's Share → Copy Link (which reads <link rel="canonical">) matches the actual page URL.
+    // Use the live host so the canonical <link> and twitter:domain meta (read by iOS Safari Share → Copy Link, Twitter cards, etc.) reflect the actual deployment instead of the upstream value baked into index.*.html.
     if (typeof window !== 'undefined' && window.location?.host) {
       this.baseDomain = window.location.host;
       this.canonicalLink?.setAttribute('href', window.location.origin + window.location.pathname);
+      this.metaService.updateTag({ name: 'twitter:domain', content: this.baseDomain });
     } else {
       try {
         const canonicalUrl = new URL(this.canonicalLink?.href || '');
