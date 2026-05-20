@@ -22,6 +22,7 @@ interface IConfig {
     HTTP_HOST: string;
     HTTP_PORT: number;
     NETWORK?: string;
+    CANONICAL_HOST?: string;
   };
   PUPPETEER: {
     ENABLED: boolean;

@@ -45,15 +45,19 @@ class Server {
     this.networkName = networks[this.network].networkName || capitalize(this.network);
 
     let canonical;
-    switch(config.MEMPOOL.NETWORK) {
-      case "liquid":
-        canonical = "https://liquid.network"
-        break;
-      case "onbtc":
-        canonical = "https://bitcoin.gob.sv"
-        break;
-      default:
-        canonical = "https://mempool.space"
+    if (config.MEMPOOL.CANONICAL_HOST) {
+      canonical = config.MEMPOOL.CANONICAL_HOST;
+    } else {
+      switch(config.MEMPOOL.NETWORK) {
+        case "liquid":
+          canonical = "https://liquid.network"
+          break;
+        case "onbtc":
+          canonical = "https://bitcoin.gob.sv"
+          break;
+        default:
+          canonical = "https://mempool.space"
+      }
     }
     this.canonicalHost = canonical;
 
@@ -367,7 +371,7 @@ class Server {
     <meta property="twitter:title" content="${ogTitle}">
     <meta property="twitter:description" content="${ogDescription}"/>
     <meta property="twitter:image:src" content="${ogImageUrl}"/>
-    <meta property="twitter:domain" content="mempool.space">
+    <meta property="twitter:domain" content="${new URL(this.canonicalHost).host}">
   </head>
   <body></body>
 </html>`;
