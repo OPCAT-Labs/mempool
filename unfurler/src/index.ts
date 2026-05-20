@@ -56,7 +56,7 @@ class Server {
           canonical = "https://bitcoin.gob.sv"
           break;
         default:
-          canonical = "https://mempool.space"
+          canonical = "https://mempool.opcatlabs.io"
       }
     }
     this.canonicalHost = canonical;

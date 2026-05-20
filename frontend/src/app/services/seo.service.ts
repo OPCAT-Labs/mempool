@@ -11,7 +11,7 @@ export class SeoService {
   network = '';
   baseTitle = 'mempool';
   baseDescription = 'Explore the full Bitcoin ecosystem&reg; with The Mempool Open Source Project&reg;.';
-  baseDomain = 'mempool.space';
+  baseDomain = 'mempool.opcatlabs.io';
 
   canonicalLink: HTMLLinkElement = document.getElementById('canonical') as HTMLLinkElement;
 
