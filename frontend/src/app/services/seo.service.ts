@@ -11,7 +11,7 @@ export class SeoService {
   network = '';
   baseTitle = 'mempool';
   baseDescription = 'Explore the full Bitcoin ecosystem&reg; with The Mempool Open Source Project&reg;.';
-  baseDomain = 'mempool.space';
+  baseDomain = 'mempool.opcatlabs.io';
 
   canonicalLink: HTMLLinkElement = document.getElementById('canonical') as HTMLLinkElement;
 
@@ -25,11 +25,18 @@ export class SeoService {
     // save original meta tags
     this.baseDescription = metaService.getTag('name=\'description\'')?.content || this.baseDescription;
     this.baseTitle = titleService.getTitle()?.split(' - ')?.[0] || this.baseTitle;
-    try {
-      const canonicalUrl = new URL(this.canonicalLink?.href || '');
-      this.baseDomain = canonicalUrl?.host;
-    } catch (e) {
-      // leave as default
+    // Use the live host so the canonical <link> and twitter:domain meta (read by iOS Safari Share → Copy Link, Twitter cards, etc.) reflect the actual deployment instead of the upstream value baked into index.*.html.
+    if (typeof window !== 'undefined' && window.location?.host) {
+      this.baseDomain = window.location.host;
+      this.canonicalLink?.setAttribute('href', window.location.origin + window.location.pathname);
+      this.metaService.updateTag({ name: 'twitter:domain', content: this.baseDomain });
+    } else {
+      try {
+        const canonicalUrl = new URL(this.canonicalLink?.href || '');
+        this.baseDomain = canonicalUrl?.host;
+      } catch (e) {
+        // leave as default
+      }
     }
 
     this.stateService.networkChanged$.subscribe((network) => this.network = network);
