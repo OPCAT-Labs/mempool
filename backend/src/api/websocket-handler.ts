@@ -117,9 +117,34 @@ class WebsocketHandler {
 
     // TODO - Fix indentation after PR is merged
     for (const server of this.webSocketServers) {
+    // Heartbeat: ping every client periodically and terminate any that didn't
+    // respond to the previous ping. This keeps idle connections alive through
+    // proxy/browser idle timeouts and reaps dead/half-open sockets that would
+    // otherwise leak into server.clients indefinitely.
+    const heartbeatInterval = setInterval(() => {
+      server.clients.forEach((client) => {
+        if (client['isAlive'] === false) {
+          client.terminate();
+          return;
+        }
+        client['isAlive'] = false;
+        try {
+          client.ping();
+        } catch (e) {
+          client.terminate();
+        }
+      });
+    }, 30000);
+    server.on('close', () => {
+      clearInterval(heartbeatInterval);
+    });
     server.on('connection', (client: WebSocket, req) => {
       this.numConnected++;
       client['remoteAddress'] = req.headers['x-forwarded-for'] || req.socket?.remoteAddress || 'unknown';
+      client['isAlive'] = true;
+      client.on('pong', () => {
+        client['isAlive'] = true;
+      });
       client.on('error', (e) => {
         logger.info(`websocket client error from ${client['remoteAddress']}: ` + (e instanceof Error ? e.message : e));
         client.close();
