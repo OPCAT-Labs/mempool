@@ -59,6 +59,22 @@ app.use(/^\/api\/address\/.*\/utxo$/, createProxyMiddleware({
   },
 }));
 
+// 3b. Scripthash UTXO endpoint - /api/scripthash/.*/utxo -> ELECTRS_API
+// NOTE: the mount regex MUST be end-anchored ($). Express `app.use()` only
+// matches a RegExp mount path when it spans the whole request path, so an
+// unanchored prefix like /^\/api\/scripthash\// never matches and would fall
+// through to the general /api backend rule (which has no utxo route -> 404).
+app.use(/^\/api\/scripthash\/.*\/utxo$/, createProxyMiddleware({
+  target: ELECTRS_API,
+  changeOrigin: true,
+  pathRewrite: {
+    '^/api': '',
+  },
+  onProxyReq: (proxyReq, req, res) => {
+    console.log(`[proxy] Scripthash UTXO: ${req.method} ${req.url} -> ${ELECTRS_API}${req.path.replace('/api', '')}`);
+  },
+}));
+
 // 4. Scripthash txs endpoint - /api/scripthash/.*/txs -> BACKEND_API/api/v1/
 app.use(/^\/api\/scripthash\/.*\/txs$/, createProxyMiddleware({
   target: BACKEND_API,
