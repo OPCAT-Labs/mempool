@@ -10709,7 +10709,7 @@ export const faqData = [
     category: 'basics',
     showConditions: bitcoinNetworks,
     fragment: 'what-are-vb-wu',
-    title: 'What are virtual bytes (vB) and weight units (WU)?',
+    title: "What determines a transaction or block's size (in bytes)?",
   },
   {
     type: 'endpoint',
