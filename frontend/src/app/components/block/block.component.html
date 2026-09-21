@@ -129,7 +129,7 @@
         <td>~<app-fee-rate [fee]="block.extras?.medianFee" rounding="1.0-0"></app-fee-rate>
           <span class="fiat">
             <app-fiat [blockConversion]="blockConversion" [value]="block.extras?.medianFee * 140" digitsInfo="1.2-2"
-              i18n-ngbTooltip="Transaction fee tooltip" ngbTooltip="Based on average native segwit transaction of 140 vBytes"
+              i18n-ngbTooltip="Transaction fee tooltip" ngbTooltip="Based on an average transaction of 140 bytes"
               placement="bottom"></app-fiat>
           </span>
         </td>
