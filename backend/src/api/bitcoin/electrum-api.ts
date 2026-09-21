@@ -248,7 +248,6 @@ class BitcoindElectrsApi extends BitcoinApi implements AbstractBitcoinApi {
           false,
           true
         );
-        tx.weight = tx.size;
         transactions.push(tx);
         loadingIndicators.setProgress(
           'address-' + scripthash,
