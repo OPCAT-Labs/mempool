@@ -10,6 +10,15 @@ export class FeeRoundingPipe implements PipeTransform {
   ) {}
 
   transform(fee: number, rounding = null): string {
+    // Fixed-width rounding (whether from a caller-supplied `rounding` or the
+    // defaults below) would print "0" for tiny non-zero fee rates (e.g. this
+    // chain's ~0.001 sat/vB fees). Scale up precision so those still show a
+    // positive number instead of rounding down to zero.
+    if (fee > 0 && fee < 1) {
+      const decimals = Math.max(2, Math.ceil(-Math.log10(fee)) + 1);
+      return formatNumber(fee, this.locale, `1.${decimals}-${decimals}`);
+    }
+
     if (rounding) {
       return formatNumber(fee, this.locale, rounding);
     }
