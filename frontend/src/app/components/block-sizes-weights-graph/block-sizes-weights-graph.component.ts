@@ -210,7 +210,7 @@ export class BlockSizesWeightsGraphComponent implements OnInit {
                 tick.data[1],
                 this.locale,
                 '1.2-2'
-              )} B/vB`;
+              )} B`;
             }
             tooltip += `<br>`;
           }
