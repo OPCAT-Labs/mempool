@@ -112,7 +112,6 @@ class TransactionUtils {
       }
     }
 
-    transaction.weight = transaction.size;
     if (addMempoolData || !transaction?.status?.confirmed) {
       return this.extendMempoolTransaction(transaction);
     } else {

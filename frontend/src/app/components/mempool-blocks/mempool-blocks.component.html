@@ -16,7 +16,7 @@
                 ~<app-fee-rate [fee]="projectedBlock.medianFee" unitClass="" rounding="1.0-0"></app-fee-rate>
               </div>
               <div *ngIf="blockDisplayMode === 'fees'; else noMiningInfo" class="block-size">
-                <app-amount [attr.data-cy]="'mempool-block-' + i + '-total-fees'" [satoshis]="projectedBlock.totalFees" digitsInfo="1.2-3" [noFiat]="true"></app-amount>
+                <app-amount [attr.data-cy]="'mempool-block-' + i + '-total-fees'" [satoshis]="projectedBlock.totalFees" [noFiat]="true"></app-amount>
               </div>
               <ng-template #noMiningInfo>
                 <div class="block-size" [innerHTML]="'&lrm;' + (projectedBlock.blockSize | bytes: 2)"></div>

@@ -66,6 +66,10 @@ interface DatabaseBlock {
   firstSeen: number;
 }
 
+// median_fee is computed as fees/size here instead of reading the stored
+// median_fee column, which is BIGINT UNSIGNED and silently truncates any
+// sub-1-satoshi-per-byte rate to 0 (this chain's typical rate is <1).
+// fees and size are plain integer columns with no such precision loss.
 const BLOCK_DB_FIELDS = `
   blocks.hash AS id,
   blocks.height,
@@ -81,7 +85,7 @@ const BLOCK_DB_FIELDS = `
   blocks.previous_block_hash AS previousblockhash,
   UNIX_TIMESTAMP(blocks.median_timestamp) AS mediantime,
   blocks.fees AS totalFees,
-  blocks.median_fee AS medianFee,
+  (blocks.fees / NULLIF(blocks.size, 0)) AS medianFee,
   blocks.fee_span AS feeRange,
   blocks.reward,
   pools.unique_id AS poolId,

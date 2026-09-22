@@ -2,7 +2,7 @@
 import { Pipe, PipeTransform } from '@angular/core';
 import { isNumberFinite, isPositive, isInteger, toDecimal } from '@app/shared/pipes/bytes-pipe/utils';
 
-export type ByteUnit = 'vB' | 'kvB' | 'MvB' | 'GvB' | 'TvB';
+export type ByteUnit = 'B' | 'kB' | 'MB' | 'GB' | 'TB';
 
 @Pipe({
     name: 'vbytes'
@@ -10,14 +10,14 @@ export type ByteUnit = 'vB' | 'kvB' | 'MvB' | 'GvB' | 'TvB';
 export class VbytesPipe implements PipeTransform {
 
     static formats: { [key: string]: { max: number, prev?: ByteUnit } } = {
-        'vB': {max: 1000},
-        'kvB': {max: Math.pow(1000, 2), prev: 'vB'},
-        'MvB': {max: Math.pow(1000, 3), prev: 'kvB'},
-        'GvB': {max: Math.pow(1000, 4), prev: 'MvB'},
-        'TvB': {max: Number.MAX_SAFE_INTEGER, prev: 'GvB'}
+        'B': {max: 1000},
+        'kB': {max: Math.pow(1000, 2), prev: 'B'},
+        'MB': {max: Math.pow(1000, 3), prev: 'kB'},
+        'GB': {max: Math.pow(1000, 4), prev: 'MB'},
+        'TB': {max: Number.MAX_SAFE_INTEGER, prev: 'GB'}
     };
 
-    transform(input: any, decimal: number = 0, from: ByteUnit = 'vB', to?: ByteUnit, plainText?: boolean): any {
+    transform(input: any, decimal: number = 0, from: ByteUnit = 'B', to?: ByteUnit, plainText?: boolean): any {
 
         if (!(isNumberFinite(input) &&
                 isNumberFinite(decimal) &&
@@ -28,7 +28,7 @@ export class VbytesPipe implements PipeTransform {
 
         let bytes = input;
         let unit = from;
-        while (unit !== 'vB') {
+        while (unit !== 'B') {
             bytes *= 1024;
             unit = VbytesPipe.formats[unit].prev!;
         }

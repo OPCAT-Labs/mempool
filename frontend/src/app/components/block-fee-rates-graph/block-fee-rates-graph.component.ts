@@ -247,7 +247,7 @@ export class BlockFeeRatesGraphComponent implements OnInit {
             if (weightMode) {
               tooltip += `${rate.marker} ${rate.seriesName}: ${(rate.data[1] / 4).toFixed(2)} sats/WU<br>`;
             } else {
-              tooltip += `${rate.marker} ${rate.seriesName}: ${rate.data[1].toFixed(2)} sats/vByte<br>`;
+              tooltip += `${rate.marker} ${rate.seriesName}: ${rate.data[1].toFixed(2)} sats/byte<br>`;
             }
           }
 
@@ -303,7 +303,7 @@ export class BlockFeeRatesGraphComponent implements OnInit {
             }
             const selectedPowerOfTen: any = selectPowerOfTen(val);
             const newVal = Math.round(val / selectedPowerOfTen.divider);
-            return `${newVal}${selectedPowerOfTen.unit} s/${weightMode ? 'WU': 'vB'}`;
+            return `${newVal}${selectedPowerOfTen.unit} s/${weightMode ? 'WU': 'B'}`;
           },
         },
         splitLine: {

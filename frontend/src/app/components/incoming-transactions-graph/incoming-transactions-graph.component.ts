@@ -83,11 +83,11 @@ export class IncomingTransactionsGraphComponent implements OnInit, OnChanges, On
    * Calculate the median value of the vbytes per second chart to hide outliers
    */
   computeMedianVbytesPerSecond(data: number[][]): void {
-    const vBytes: number[] = [];
+    const sizes: number[] = [];
     for (const value of data) {
-      vBytes.push(value[1]);
+      sizes.push(value[1]);
     }
-    const sorted = vBytes.slice().sort((a, b) => a - b);
+    const sorted = sizes.slice().sort((a, b) => a - b);
     const middle = Math.floor(sorted.length / 2);
     this.medianVbytesPerSecond = sorted[middle];
     if (sorted.length % 2 === 0) {
@@ -223,7 +223,7 @@ export class IncomingTransactionsGraphComponent implements OnInit, OnChanges, On
             itemFormatted += `<div class="item">
                   <div class="indicator-container">${colorSpan(bestItem.color)}</div>
                   <div class="grow"></div>
-                  <div class="value">${formatNumber(bestItem.value[1], this.locale, '1.0-0')} <span class="symbol">vB/s</span></div>
+                  <div class="value">${formatNumber(bestItem.value[1], this.locale, '1.0-0')} <span class="symbol">B/s</span></div>
                 </div>`;
           }
           return `<div class="tx-wrapper-tooltip-chart ${(this.template === 'advanced') ? 'tx-wrapper-tooltip-chart-advanced' : ''}" 
