@@ -110,6 +110,32 @@ class WebsocketHandler {
     return this.serializedInitData;
   }
 
+  // Skip clients whose outbound buffer is backing up beyond this. Prevents
+  // unbounded memory growth from slow consumers and reduces the chance that a
+  // later terminate() truncates a huge half-sent frame (seen as "invalid frame").
+  private static readonly MAX_BUFFERED_BYTES = 8 * 1024 * 1024; // 8 MiB
+
+  // Single choke-point for every server->client send. Re-checks readyState
+  // immediately before writing (the socket may have closed during an await),
+  // applies backpressure, and never lets a failed send throw out of a broadcast
+  // loop (which would silently skip every client after it).
+  private safeSend(client: WebSocket.WebSocket, data: WebSocket.Data): boolean {
+    if (client.readyState !== WebSocket.OPEN) {
+      return false;
+    }
+    if (client.bufferedAmount > WebsocketHandler.MAX_BUFFERED_BYTES) {
+      logger.debug(`websocket client ${client['remoteAddress']} backpressure ${client.bufferedAmount}B, skipping send`);
+      return false;
+    }
+    try {
+      client.send(data);
+      return true;
+    } catch (e) {
+      logger.debug(`websocket send failed to ${client['remoteAddress']}: ` + (e instanceof Error ? e.message : e));
+      return false;
+    }
+  }
+
   setupConnectionHandling() {
     if (!this.webSocketServers.length) {
       throw new Error('No WebSocket.Server have been set');
@@ -124,7 +150,26 @@ class WebsocketHandler {
     const heartbeatInterval = setInterval(() => {
       server.clients.forEach((client) => {
         if (client['isAlive'] === false) {
-          client.terminate();
+          // Missed the previous ping cycle. Close gracefully so any in-flight
+          // frame finishes flushing, then force-terminate after a short grace
+          // period if it still hasn't closed. Terminating outright (destroy)
+          // would discard a half-sent frame -> "invalid frame" on the client.
+          if (client['closing']) {
+            return;
+          }
+          client['closing'] = true;
+          try {
+            client.close();
+          } catch (e) {
+            client.terminate();
+            return;
+          }
+          const t = setTimeout(() => {
+            if (client.readyState !== WebSocket.CLOSED) {
+              client.terminate();
+            }
+          }, 5000);
+          t.unref?.();
           return;
         }
         client['isAlive'] = false;
@@ -406,7 +451,7 @@ class WebsocketHandler {
             if (!this.socketData['blocks']?.length) {
               return;
             }
-            client.send(this.serializedInitData);
+            this.safeSend(client, this.serializedInitData);
           }
 
           if (parsedMessage.action === 'ping') {
@@ -440,7 +485,7 @@ class WebsocketHandler {
           }
 
           if (Object.keys(response).length) {
-            client.send(this.serializeResponse(response));
+            this.safeSend(client, this.serializeResponse(response));
           }
         } catch (e) {
           logger.debug(`Error parsing websocket message from ${client['remoteAddress']}: ` + (e instanceof Error ? e.message : e));
@@ -463,7 +508,7 @@ class WebsocketHandler {
         return;
       }
       if (client['track-donation'] === id) {
-        client.send(JSON.stringify({ donationConfirmed: true }));
+        this.safeSend(client, JSON.stringify({ donationConfirmed: true }));
       }
     });
     }
@@ -483,7 +528,7 @@ class WebsocketHandler {
       if (client.readyState !== WebSocket.OPEN) {
         return;
       }
-      client.send(response);
+      this.safeSend(client, response);
     });
     }
   }
@@ -502,7 +547,7 @@ class WebsocketHandler {
       if (client.readyState !== WebSocket.OPEN) {
         return;
       }
-      client.send(response);
+      this.safeSend(client, response);
     });
     }
   }
@@ -529,7 +574,7 @@ class WebsocketHandler {
         return;
       }
 
-      client.send(response);
+      this.safeSend(client, response);
     });
     }
   }
@@ -562,7 +607,7 @@ class WebsocketHandler {
           if (client.readyState !== WebSocket.OPEN) {
             return;
           }
-          client.send(response);
+          this.safeSend(client, response);
         });
       }
     } catch (e) {
@@ -600,7 +645,7 @@ class WebsocketHandler {
       }
 
       if (Object.keys(response).length) {
-        client.send(this.serializeResponse(response));
+        this.safeSend(client, this.serializeResponse(response));
       }
     });
     }
@@ -765,7 +810,11 @@ class WebsocketHandler {
 
     // TODO - Fix indentation after PR is merged
     for (const server of this.webSocketServers) {
-    server.clients.forEach(async (client) => {
+    // Await all per-client work so this cycle fully completes before the caller
+    // resolves — prevents the next mempool cycle from overlapping and racing on
+    // shared state, and stops async-forEach errors becoming unhandled rejections.
+    await Promise.all(Array.from(server.clients).map(async (client) => {
+      try {
       if (client.readyState !== WebSocket.OPEN) {
         return;
       }
@@ -1022,9 +1071,12 @@ class WebsocketHandler {
       }
 
       if (Object.keys(response).length) {
-        client.send(this.serializeResponse(response));
+        this.safeSend(client, this.serializeResponse(response));
       }
-    });
+      } catch (e) {
+        logger.debug(`Error building/sending mempool update to ${client['remoteAddress']}: ` + (e instanceof Error ? e.message : e));
+      }
+    }));
     }
   }
  
@@ -1418,7 +1470,7 @@ class WebsocketHandler {
       }
 
       if (Object.keys(response).length) {
-        client.send(this.serializeResponse(response));
+        this.safeSend(client, this.serializeResponse(response));
       }
     });
     }
@@ -1437,7 +1489,7 @@ class WebsocketHandler {
           return;
         }
         if (client['track-stratum'] && (client['track-stratum'] === 'all' || client['track-stratum'] === job.pool)) {
-          client.send(JSON.stringify({
+          this.safeSend(client, JSON.stringify({
             'stratumJob': job
         }));
         }
