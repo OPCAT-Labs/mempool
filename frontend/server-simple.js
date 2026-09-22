@@ -124,23 +124,26 @@ app.use(/^\/api\/address\//, createProxyMiddleware({
 }));
 
 // 8. WebSocket for API v1 - /api/v1/ws -> BACKEND_API
-app.use('/api/v1/ws', createProxyMiddleware({
+// NOTE: `ws: true` is intentionally NOT set on any middleware. With ws:true,
+// http-proxy-middleware lazily subscribes its own server 'upgrade' listener on
+// the first HTTP request through the middleware, and that listener matches ALL
+// upgrade requests (Express mount paths are not applied to upgrades). With
+// several ws:true middlewares, one upgrade gets proxied multiple times onto the
+// same socket, corrupting frames ("Invalid frame header" / "RSV1 must be clear").
+// Upgrades are instead routed exactly once in server.on('upgrade') below.
+const wsV1Proxy = createProxyMiddleware({
   target: BACKEND_API,
   changeOrigin: true,
-  ws: true,
   pathRewrite: {
     '^/api/v1/ws': '/',
   },
-  onProxyReq: (proxyReq, req, res) => {
-    console.log(`[proxy] WebSocket v1: ${req.method} ${req.url} -> ${BACKEND_API}/`);
-  },
-}));
+});
+app.use('/api/v1/ws', wsV1Proxy);
 
 // 9. API v1 - /api/v1/ -> BACKEND_API/api/v1/
 app.use('/api/v1', createProxyMiddleware({
   target: BACKEND_API,
   changeOrigin: true,
-  ws: true,
   onProxyReq: (proxyReq, req, res) => {
     console.log(`[proxy] API v1: ${req.method} ${req.url} -> ${BACKEND_API}${req.path}`);
   },
@@ -159,17 +162,14 @@ app.use('/api', createProxyMiddleware({
 }));
 
 // 11. Main WebSocket - /ws -> BACKEND_API
-app.use('/ws', createProxyMiddleware({
+const wsProxy = createProxyMiddleware({
   target: BACKEND_API,
   changeOrigin: true,
-  ws: true,
   pathRewrite: {
     '^/ws': '/',
   },
-  onProxyReq: (proxyReq, req, res) => {
-    console.log(`[proxy] WebSocket: ${req.method} ${req.url} -> ${BACKEND_API}/`);
-  },
-}));
+});
+app.use('/ws', wsProxy);
 
 // ======================
 // Static File Serving
@@ -247,9 +247,16 @@ const server = app.listen(PORT, () => {
   console.log(`========================================\n`);
 });
 
-// Handle WebSocket upgrade
+// Handle WebSocket upgrade — route each upgrade to exactly one proxy
 server.on('upgrade', (req, socket, head) => {
   console.log(`[server] WebSocket upgrade request: ${req.url}`);
+  if (req.url.startsWith('/api/v1/ws')) {
+    wsV1Proxy.upgrade(req, socket, head);
+  } else if (req.url.startsWith('/ws')) {
+    wsProxy.upgrade(req, socket, head);
+  } else {
+    socket.destroy();
+  }
 });
 
 // Graceful shutdown
