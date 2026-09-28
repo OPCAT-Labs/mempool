@@ -172,6 +172,11 @@ class TransactionUtils {
           }
         }
 
+        // Ensure weight is set (electrs/electrum may not provide it)
+        if (!transaction.weight) {
+          transaction.weight = transaction.size;
+        }
+
         return this.extendMempoolTransaction(transaction);
       });
     }
