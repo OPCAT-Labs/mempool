@@ -342,14 +342,23 @@ class Blocks {
   }
 
   /**
-   * Fetch AuxPoW coinbase from Bitcoin RPC for merged mining chains
-   * This is needed when using Esplora/Electrum backend which doesn't include auxpow data
+   * Fetch the parent chain coinbase (scriptsig + outputs) from the AuxPoW data of a merged mined block.
+   * The parent chain miner is who actually mined the block, so pool detection must use it.
+   * Only `getblock` (verbose) exposes `auxpow`; Esplora/Electrum backends don't include it.
    */
-  private async $getAuxPowCoinbase(blockHash: string): Promise<string | undefined> {
+  private async $getAuxPowMinerInfo(blockHash: string): Promise<TransactionMinerInfo | undefined> {
     try {
       const rpcBlock = await bitcoinClient.getBlock(blockHash);
-      if (rpcBlock?.auxpow?.tx?.vin?.[0]?.coinbase) {
-        return rpcBlock.auxpow.tx.vin[0].coinbase;
+      const auxTx = rpcBlock?.auxpow?.tx;
+      if (auxTx?.vin?.[0]?.coinbase) {
+        return {
+          vin: [{ scriptsig: auxTx.vin[0].coinbase }],
+          vout: (auxTx.vout || []).map((vout) => ({
+            scriptpubkey_address: vout.scriptPubKey?.address ?? vout.scriptPubKey?.addresses?.[0],
+            scriptpubkey_asm: vout.scriptPubKey?.asm,
+            value: Math.round(vout.value * 100000000),
+          })),
+        };
       }
     } catch (e) {
       // AuxPoW not available or RPC error - fall back to regular coinbase
@@ -380,11 +389,12 @@ class Blocks {
     );
 
     // For AuxPoW (merged mining) chains, use coinbase from parent block for miner identification
-    // If not already present (Esplora/Electrum backend), fetch from RPC
-    let auxpowCoinbase = block.auxpowCoinbase;
-    if (!auxpowCoinbase && config.MEMPOOL.BACKEND !== 'none') {
-      auxpowCoinbase = await this.$getAuxPowCoinbase(block.id);
+    // Esplora/Electrum backends don't include auxpow data, so fetch it from RPC
+    let auxpowMinerInfo: TransactionMinerInfo | undefined;
+    if (block.auxpowCoinbase || config.MEMPOOL.BACKEND !== 'none') {
+      auxpowMinerInfo = await this.$getAuxPowMinerInfo(block.id);
     }
+    const auxpowCoinbase = auxpowMinerInfo?.vin[0].scriptsig ?? block.auxpowCoinbase;
     extras.coinbaseRaw = auxpowCoinbase || coinbaseTx.vin[0].scriptsig;
     extras.orphans = chainTips.getOrphanedBlocksAtHeight(blk.height);
 
@@ -465,7 +475,10 @@ class Blocks {
 
     if (['mainnet', 'testnet', 'signet'].includes(config.MEMPOOL.NETWORK)) {
       let pool: PoolTag;
-      if (coinbaseTx !== undefined) {
+      if (auxpowMinerInfo !== undefined) {
+        // Merged mined block: the pool is identified by the parent chain coinbase
+        pool = await this.$findBlockMiner(auxpowMinerInfo);
+      } else if (coinbaseTx !== undefined) {
         pool = await this.$findBlockMiner(coinbaseTx);
       } else {
         if (config.DATABASE.ENABLED === true) {
