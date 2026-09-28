@@ -173,11 +173,9 @@ class TransactionUtils {
           }
         }
 
-        // Ensure weight is set (electrs/electrum may not provide it)
         // For Legacy Bitcoin (no SegWit), weight = size * 4 (since vsize = weight / 4 = size)
-        if (!transaction.weight) {
-          transaction.weight = transaction.size * 4;
-        }
+        // Always override because electrs returns weight = size (incorrect for legacy)
+        transaction.weight = transaction.size * 4;
 
         return this.extendMempoolTransaction(transaction);
       });
@@ -192,11 +190,9 @@ class TransactionUtils {
       // @ts-ignore
       return transaction;
     }
-    // Ensure weight is set (electrs/electrum may not provide it for Legacy Bitcoin)
     // For Legacy Bitcoin (no SegWit), weight = size * 4 (since vsize = weight / 4 = size)
-    if (!transaction.weight) {
-      transaction.weight = transaction.size * 4;
-    }
+    // Always override because electrs returns weight = size (incorrect for legacy)
+    transaction.weight = transaction.size * 4;
     const feePerVbytes = (transaction.fee || 0) / transaction.size;
     const transactionExtended: TransactionExtended = Object.assign(
       {
@@ -215,11 +211,9 @@ class TransactionUtils {
   public extendMempoolTransaction(
     transaction: IEsploraApi.Transaction
   ): MempoolTransactionExtended {
-    // Ensure weight is set (electrs/electrum may not provide it for Legacy Bitcoin)
     // For Legacy Bitcoin (no SegWit), weight = size * 4 (since vsize = weight / 4 = size)
-    if (!transaction.weight) {
-      transaction.weight = transaction.size * 4;
-    }
+    // Always override because electrs returns weight = size (incorrect for legacy)
+    transaction.weight = transaction.size * 4;
     const vsize = transaction.size;
     const fractionalVsize = transaction.weight / 4;
     let sigops = Common.isLiquid()
