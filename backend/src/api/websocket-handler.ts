@@ -113,7 +113,7 @@ class WebsocketHandler {
   // Skip clients whose outbound buffer is backing up beyond this. Prevents
   // unbounded memory growth from slow consumers and reduces the chance that a
   // later terminate() truncates a huge half-sent frame (seen as "invalid frame").
-  private static readonly MAX_BUFFERED_BYTES = 8 * 1024 * 1024; // 8 MiB
+  private static readonly MAX_BUFFERED_BYTES = 32 * 1024 * 1024; // 32 MiB
 
   // Single choke-point for every server->client send. Re-checks readyState
   // immediately before writing (the socket may have closed during an await),
@@ -813,7 +813,7 @@ class WebsocketHandler {
     // Await all per-client work so this cycle fully completes before the caller
     // resolves — prevents the next mempool cycle from overlapping and racing on
     // shared state, and stops async-forEach errors becoming unhandled rejections.
-    await Promise.all(Array.from(server.clients).map(async (client) => {
+    await Promise.all((Array.from(server.clients) as WebSocket.WebSocket[]).map(async (client) => {
       try {
       if (client.readyState !== WebSocket.OPEN) {
         return;
