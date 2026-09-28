@@ -466,7 +466,13 @@ class Blocks {
     if (['mainnet', 'testnet', 'signet'].includes(config.MEMPOOL.NETWORK)) {
       let pool: PoolTag;
       if (coinbaseTx !== undefined) {
-        pool = await this.$findBlockMiner(coinbaseTx);
+        // Merged mined block: the pool tag is in the parent chain coinbase (auxpow),
+        // while the payout addresses are in the OP_CAT coinbase outputs
+        pool = await this.$findBlockMiner(
+          auxpowCoinbase
+            ? { vin: [{ scriptsig: auxpowCoinbase }], vout: coinbaseTx.vout }
+            : coinbaseTx
+        );
       } else {
         if (config.DATABASE.ENABLED === true) {
           pool = await poolsRepository.$getUnknownPool();
