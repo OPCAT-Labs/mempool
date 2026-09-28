@@ -456,7 +456,9 @@ class BitcoinApi implements AbstractBitcoinApi {
         };
       }
     }
-    transaction.fee = Math.round(mempoolEntry.fees?.base * 100000000);
+    // Older nodes (incl. OP_CAT) report the fee as a top-level `fee` field instead of `fees.base`
+    const baseFee = mempoolEntry.fees?.base ?? (mempoolEntry as any).fee ?? 0;
+    transaction.fee = Math.round(baseFee * 100000000);
     return transaction;
   }
 

@@ -1127,13 +1127,14 @@ export class Common {
     let medianWeight = 0;
 
     // calculate the "medianFee" as the average fee rate of the middle 0.25% weight units of transactions
-    const halfWidth = config.MEMPOOL.BLOCK_WEIGHT_UNITS / 800;
-    const leftBound = Math.floor(
-      config.MEMPOOL.BLOCK_WEIGHT_UNITS / 2 - halfWidth
+    // (centered on the actual block weight, so non-full blocks don't yield a zero median)
+    const blockWeight = Math.min(
+      config.MEMPOOL.BLOCK_WEIGHT_UNITS,
+      sortedTxs.reduce((total, tx) => total + tx.weight, 0)
     );
-    const rightBound = Math.ceil(
-      config.MEMPOOL.BLOCK_WEIGHT_UNITS / 2 + halfWidth
-    );
+    const halfWidth = blockWeight / 800;
+    const leftBound = Math.floor(blockWeight / 2 - halfWidth);
+    const rightBound = Math.ceil(blockWeight / 2 + halfWidth);
     for (let i = 0; i < sortedTxs.length && weightCount < rightBound; i++) {
       const left = weightCount;
       const right = weightCount + sortedTxs[i].weight;
