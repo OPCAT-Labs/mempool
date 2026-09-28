@@ -112,6 +112,8 @@ class TransactionUtils {
       }
     }
 
+    // For Legacy Bitcoin (no SegWit), weight = size * 4 (since vsize = weight / 4 = size)
+    transaction.weight = transaction.size * 4;
     if (addMempoolData || !transaction?.status?.confirmed) {
       return this.extendMempoolTransaction(transaction);
     } else {
@@ -172,8 +174,9 @@ class TransactionUtils {
         }
 
         // Ensure weight is set (electrs/electrum may not provide it)
+        // For Legacy Bitcoin (no SegWit), weight = size * 4 (since vsize = weight / 4 = size)
         if (!transaction.weight) {
-          transaction.weight = transaction.size;
+          transaction.weight = transaction.size * 4;
         }
 
         return this.extendMempoolTransaction(transaction);
@@ -190,8 +193,9 @@ class TransactionUtils {
       return transaction;
     }
     // Ensure weight is set (electrs/electrum may not provide it for Legacy Bitcoin)
+    // For Legacy Bitcoin (no SegWit), weight = size * 4 (since vsize = weight / 4 = size)
     if (!transaction.weight) {
-      transaction.weight = transaction.size;
+      transaction.weight = transaction.size * 4;
     }
     const feePerVbytes = (transaction.fee || 0) / transaction.size;
     const transactionExtended: TransactionExtended = Object.assign(
@@ -212,8 +216,9 @@ class TransactionUtils {
     transaction: IEsploraApi.Transaction
   ): MempoolTransactionExtended {
     // Ensure weight is set (electrs/electrum may not provide it for Legacy Bitcoin)
+    // For Legacy Bitcoin (no SegWit), weight = size * 4 (since vsize = weight / 4 = size)
     if (!transaction.weight) {
-      transaction.weight = transaction.size;
+      transaction.weight = transaction.size * 4;
     }
     const vsize = transaction.size;
     const fractionalVsize = transaction.weight / 4;
