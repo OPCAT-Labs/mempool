@@ -189,6 +189,10 @@ class TransactionUtils {
       // @ts-ignore
       return transaction;
     }
+    // Ensure weight is set (electrs/electrum may not provide it for Legacy Bitcoin)
+    if (!transaction.weight) {
+      transaction.weight = transaction.size;
+    }
     const feePerVbytes = (transaction.fee || 0) / transaction.size;
     const transactionExtended: TransactionExtended = Object.assign(
       {
@@ -207,6 +211,10 @@ class TransactionUtils {
   public extendMempoolTransaction(
     transaction: IEsploraApi.Transaction
   ): MempoolTransactionExtended {
+    // Ensure weight is set (electrs/electrum may not provide it for Legacy Bitcoin)
+    if (!transaction.weight) {
+      transaction.weight = transaction.size;
+    }
     const vsize = transaction.size;
     const fractionalVsize = transaction.weight / 4;
     let sigops = Common.isLiquid()
