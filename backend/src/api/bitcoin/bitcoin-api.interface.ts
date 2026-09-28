@@ -46,7 +46,6 @@ export namespace IBitcoinApi {
       value: number;
       n: number;
       scriptPubKey: {
-        asm?: string;
         addresses?: string[];
         address?: string;
       };
