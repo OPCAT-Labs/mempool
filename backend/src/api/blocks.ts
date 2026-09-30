@@ -529,7 +529,12 @@ class Blocks {
   private async $findBlockMiner(
     txMinerInfo: TransactionMinerInfo | undefined
   ): Promise<PoolTag> {
-    if (txMinerInfo === undefined || txMinerInfo.vout.length < 1) {
+    // Zero-reward coinbases have every output filtered out by stripCoinbaseTransaction, but the
+    // scriptsig tag (e.g. the auxpow parent coinbase) can still identify the pool
+    if (
+      txMinerInfo === undefined ||
+      (txMinerInfo.vout.length < 1 && !txMinerInfo.vin[0]?.scriptsig)
+    ) {
       if (config.DATABASE.ENABLED === true) {
         return await poolsRepository.$getUnknownPool();
       } else {
