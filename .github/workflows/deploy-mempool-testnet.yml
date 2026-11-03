@@ -34,24 +34,25 @@ jobs:
           MISSING_VARS=()
 
           [ -z "${{ vars.BACKEND_PORT }}" ] && MISSING_VARS+=("BACKEND_PORT")
-          [ -z "${{ vars.ELECTRS_API }}" ] && MISSING_VARS+=("ELECTRS_API")
+          [ -z "${{ secrets.ELECTRS_API }}" ] && MISSING_VARS+=("ELECTRS_API (secret)")
           [ -z "${{ vars.TRACKER_API }}" ] && MISSING_VARS+=("TRACKER_API")
           [ -z "${{ vars.DEPLOY_HOST_NAME }}" ] && MISSING_VARS+=("DEPLOY_HOST_NAME")
           [ -z "${{ vars.MEMPOOL_NETWORK }}" ] && MISSING_VARS+=("MEMPOOL_NETWORK")
           [ -z "${{ vars.FRONTEND_PORT }}" ] && MISSING_VARS+=("FRONTEND_PORT")
-          [ -z "${{ vars.ELECTRUM_HOST }}" ] && MISSING_VARS+=("ELECTRUM_HOST")
+          [ -z "${{ secrets.ELECTRUM_HOST }}" ] && MISSING_VARS+=("ELECTRUM_HOST (secret)")
           [ -z "${{ vars.ELECTRUM_PORT }}" ] && MISSING_VARS+=("ELECTRUM_PORT")
-          [ -z "${{ vars.CORE_RPC_HOST }}" ] && MISSING_VARS+=("CORE_RPC_HOST")
+          [ -z "${{ secrets.CORE_RPC_HOST }}" ] && MISSING_VARS+=("CORE_RPC_HOST (secret)")
           [ -z "${{ vars.CORE_RPC_PORT }}" ] && MISSING_VARS+=("CORE_RPC_PORT")
-          [ -z "${{ vars.CORE_RPC_USERNAME }}" ] && MISSING_VARS+=("CORE_RPC_USERNAME")
+          [ -z "${{ secrets.CORE_RPC_USERNAME }}" ] && MISSING_VARS+=("CORE_RPC_USERNAME (secret)")
           [ -z "${{ vars.DATABASE_HOST }}" ] && MISSING_VARS+=("DATABASE_HOST")
           [ -z "${{ vars.DATABASE_PORT }}" ] && MISSING_VARS+=("DATABASE_PORT")
           [ -z "${{ vars.DATABASE_NAME }}" ] && MISSING_VARS+=("DATABASE_NAME")
           [ -z "${{ vars.DATABASE_USERNAME }}" ] && MISSING_VARS+=("DATABASE_USERNAME")
-          [ -z "${{ vars.DEPLOY_HOST }}" ] && MISSING_VARS+=("DEPLOY_HOST")
+          [ -z "${{ secrets.DEPLOY_HOST }}" ] && MISSING_VARS+=("DEPLOY_HOST (secret)")
           [ -z "${{ vars.DEPLOY_USER }}" ] && MISSING_VARS+=("DEPLOY_USER")
           [ -z "${{ vars.DEPLOY_DIR }}" ] && MISSING_VARS+=("DEPLOY_DIR")
           [ -z "${{ secrets.DEPLOY_SSH_KEY }}" ] && MISSING_VARS+=("DEPLOY_SSH_KEY (secret)")
+          [ -z "${{ secrets.DEPLOY_KNOWN_HOSTS }}" ] && MISSING_VARS+=("DEPLOY_KNOWN_HOSTS (secret)")
           [ -z "${{ secrets.CORE_RPC_PASSWORD }}" ] && MISSING_VARS+=("CORE_RPC_PASSWORD (secret)")
           [ -z "${{ secrets.DATABASE_PASSWORD }}" ] && MISSING_VARS+=("DATABASE_PASSWORD (secret)")
 
@@ -218,19 +219,24 @@ jobs:
           mv ./artifacts/deployment.tar.gz ./deployment.tar.gz
           echo "✅ Deployment package ready: $(du -h ./deployment.tar.gz)"
 
+      # Host keys are pinned in DEPLOY_KNOWN_HOSTS rather than trusted on first use
       - name: Setup SSH
+        env:
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
         run: |
           mkdir -p ~/.ssh
-          echo "${{ secrets.DEPLOY_SSH_KEY }}" > ~/.ssh/deploy_key
-          chmod 600 ~/.ssh/deploy_key
-          ssh-keyscan -p ${{ vars.DEPLOY_PORT || 22 }} -H ${{ vars.DEPLOY_HOST }} >> ~/.ssh/known_hosts
+          chmod 700 ~/.ssh
+          printf '%s\n' "${DEPLOY_SSH_KEY}" > ~/.ssh/deploy_key
+          printf '%s\n' "${DEPLOY_KNOWN_HOSTS}" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/deploy_key ~/.ssh/known_hosts
 
       - name: Upload deployment package
         run: |
           scp -i ~/.ssh/deploy_key \
             -P ${{ vars.DEPLOY_PORT || 22 }} \
-            -o UserKnownHostsFile=~/.ssh/known_hosts \
-            deployment.tar.gz ${{ vars.DEPLOY_USER }}@${{ vars.DEPLOY_HOST }}:/tmp/
+            -o UserKnownHostsFile=~/.ssh/known_hosts -o StrictHostKeyChecking=yes -o BatchMode=yes \
+            deployment.tar.gz ${{ vars.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}:/tmp/
 
       - name: Deploy to server
         env:
@@ -239,15 +245,15 @@ jobs:
           DEPLOY_DIR: ${{ vars.DEPLOY_DIR }}
           BACKEND_PORT: ${{ vars.BACKEND_PORT }}
           FRONTEND_PORT: ${{ vars.FRONTEND_PORT }}
-          ELECTRS_API: ${{ vars.ELECTRS_API }}
+          ELECTRS_API: ${{ secrets.ELECTRS_API }}
           TRACKER_API: ${{ vars.TRACKER_API }}
           MEMPOOL_NETWORK: ${{ vars.MEMPOOL_NETWORK }}
-          ELECTRUM_HOST: ${{ vars.ELECTRUM_HOST }}
+          ELECTRUM_HOST: ${{ secrets.ELECTRUM_HOST }}
           ELECTRUM_PORT: ${{ vars.ELECTRUM_PORT }}
           ELECTRUM_TLS_ENABLED: ${{ vars.ELECTRUM_TLS_ENABLED }}
-          CORE_RPC_HOST: ${{ vars.CORE_RPC_HOST }}
+          CORE_RPC_HOST: ${{ secrets.CORE_RPC_HOST }}
           CORE_RPC_PORT: ${{ vars.CORE_RPC_PORT }}
-          CORE_RPC_USERNAME: ${{ vars.CORE_RPC_USERNAME }}
+          CORE_RPC_USERNAME: ${{ secrets.CORE_RPC_USERNAME }}
           DATABASE_HOST: ${{ vars.DATABASE_HOST }}
           DATABASE_PORT: ${{ vars.DATABASE_PORT }}
           DATABASE_NAME: ${{ vars.DATABASE_NAME }}
@@ -259,8 +265,8 @@ jobs:
         run: |
           ssh -i ~/.ssh/deploy_key \
             -p ${{ vars.DEPLOY_PORT || 22 }} \
-            -o UserKnownHostsFile=~/.ssh/known_hosts \
-            ${{ vars.DEPLOY_USER }}@${{ vars.DEPLOY_HOST }} \
+            -o UserKnownHostsFile=~/.ssh/known_hosts -o StrictHostKeyChecking=yes -o BatchMode=yes \
+            ${{ vars.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }} \
             env DEPLOY_DIR="$DEPLOY_DIR" \
                 BACKEND_PORT="$BACKEND_PORT" \
                 FRONTEND_PORT="$FRONTEND_PORT" \
